@@ -1,4 +1,4 @@
-.PHONY: up down demo reset test logs local
+.PHONY: up down demo reset test logs local photos
 
 up:            ## Поднять приложение и базу
 	docker compose up --build
@@ -23,3 +23,6 @@ test:          ## Прогнать тесты (PostgreSQL не нужен)
 
 local:         ## Запуск без Docker на SQLite
 	DATABASE_URL=sqlite+aiosqlite:///./bioeat.db uvicorn app.main:app --reload
+
+photos:        ## Скачать недостающие фотографии блюд (см. scripts/README.md)
+	DATABASE_URL=sqlite+aiosqlite:///./bioeat.db python scripts/fetch_dish_images.py

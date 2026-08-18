@@ -1,6 +1,7 @@
 /* Рабочий экран оператора столовой: очередь заказов и выдача по коду. */
 import api from '../api.js';
 import { esc, money, toast, isoDate, dateLabel, skeletonList, empty } from '../ui.js';
+import { itemThumb } from '../components.js';
 
 const COLUMNS = [
   { key: 'paid', title: 'Новые', hint: 'оплачены, ждут подтверждения', next: 'accepted', nextLabel: 'Принять' },

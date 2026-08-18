@@ -84,7 +84,16 @@ async def make_order(
         price = money(dish.price)
         subtotal += money(price * qty)
         items.append(
-            OrderItem(dish_id=dish.id, name=dish.name, icon=dish.icon, price=price, qty=qty)
+            OrderItem(
+                dish_id=dish.id,
+                name=dish.name,
+                icon=dish.icon,
+                image_thumb_url=dish.image_thumb_url or "",
+                image_placeholder=dish.image_placeholder or "",
+                category_id=dish.category_id,
+                price=price,
+                qty=qty,
+            )
         )
         dish.stock_qty = max(0, dish.stock_qty - qty)
 
