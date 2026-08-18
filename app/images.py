@@ -100,11 +100,11 @@ def dominant_color(image: Image.Image) -> str:
     не мигает серым прямоугольником и не «прыгает».
     """
     tiny = image.convert("RGB").resize((16, 16), Image.Resampling.BILINEAR)
-    pixels = list(tiny.getdata())
-    count = len(pixels)
-    r = sum(p[0] for p in pixels) // count
-    g = sum(p[1] for p in pixels) // count
-    b = sum(p[2] for p in pixels) // count
+    raw = tiny.tobytes()                       # RGBRGBRGB…
+    count = len(raw) // 3
+    r = sum(raw[0::3]) // count
+    g = sum(raw[1::3]) // count
+    b = sum(raw[2::3]) // count
     # слегка притемняем: фото почти всегда темнее своего среднего по краям
     r, g, b = (int(c * 0.82) for c in (r, g, b))
     return f"#{r:02x}{g:02x}{b:02x}"
