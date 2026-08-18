@@ -16,6 +16,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app ./app
 COPY static ./static
 
+# точка монтирования тома с фотографиями, загруженными из админ-панели
+RUN mkdir -p /srv/static/uploads/dishes
+
 EXPOSE 8000
 
 HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=5 \

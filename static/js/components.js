@@ -1,7 +1,8 @@
 /* Переиспользуемые куски интерфейса. */
 import api from './api.js';
 import { state, cartQty, setCart } from './state.js';
-import { esc, money, toast, openSheet, closeSheet, TAG_LABELS, vibrate } from './ui.js';
+import { esc, money, toast, TAG_LABELS, vibrate } from './ui.js';
+import { categoryIcon } from './icons.js';
 
 const CATEGORY_GRADIENTS = {
   combo: 'linear-gradient(135deg,#1f5bff,#4a86ff)',
@@ -14,10 +15,66 @@ const CATEGORY_GRADIENTS = {
   desserts: 'linear-gradient(135deg,#8f34a8,#b74cd4)',
 };
 
+const categoryOf = (dish) => state.categories.find((c) => c.id === dish.category_id);
+
 export const dishGradient = (dish) => {
-  const cat = state.categories.find((c) => c.id === dish.category_id);
+  const cat = categoryOf(dish);
   return CATEGORY_GRADIENTS[cat?.slug] || `linear-gradient(135deg,${cat?.color || '#2f6bff'},#4a86ff)`;
 };
+
+/** Заглушка вместо фото: иконка категории на её градиенте. */
+export function dishFallback(dish) {
+  const cat = categoryOf(dish);
+  return `<span class="dish-img__fallback" style="background:${dishGradient(dish)}">
+            ${categoryIcon(cat?.slug)}
+          </span>`;
+}
+
+/**
+ * Превью блюда для списков.
+ * Ширина и высота заданы жёстко, контейнеру задан aspect-ratio —
+ * при загрузке фото вёрстка не «дёргается».
+ */
+export function dishThumb(dish, { sizes = '', width = 400, height = 300 } = {}) {
+  const bg = dish.image_placeholder ? ` style="background:${esc(dish.image_placeholder)}"` : '';
+  if (!dish.image_thumb_url) {
+    return `<span class="dish-img"${bg}>${dishFallback(dish)}</span>`;
+  }
+  return `<span class="dish-img"${bg}>
+            <img src="${esc(dish.image_thumb_url)}" alt="${esc(dish.name)}"
+                 loading="lazy" decoding="async" width="${width}" height="${height}"
+                 ${sizes ? `sizes="${esc(sizes)}"` : ''}>
+          </span>`;
+}
+
+/** Большое фото в шапке карточки блюда. */
+export function dishHero(dish) {
+  const bg = dish.image_placeholder ? ` style="background:${esc(dish.image_placeholder)}"` : '';
+  if (!dish.image_url) {
+    return `<span class="dish-img dish-img--hero"${bg}>${dishFallback(dish)}</span>`;
+  }
+  return `<span class="dish-img dish-img--hero"${bg}>
+            <img src="${esc(dish.image_url)}" alt="${esc(dish.name)}"
+                 decoding="async" fetchpriority="high" width="800" height="600">
+          </span>`;
+}
+
+/**
+ * Маленькое превью для корзины, состава заказа и очереди оператора.
+ * Позиция заказа хранит снимок ссылки на фото, поэтому объект может быть
+ * не блюдом из меню, а строкой заказа — поля те же.
+ */
+export function itemThumb(item) {
+  const shape = { category_id: item.category_id ?? 0, name: item.name, ...item };
+  const bg = item.image_placeholder ? ` style="background:${esc(item.image_placeholder)}"` : '';
+  if (!item.image_thumb_url) {
+    return `<span class="dish-img dish-img--mini"${bg}>${dishFallback(shape)}</span>`;
+  }
+  return `<span class="dish-img dish-img--mini"${bg}>
+            <img src="${esc(item.image_thumb_url)}" alt="${esc(item.name)}"
+                 loading="lazy" decoding="async" width="400" height="300">
+          </span>`;
+}
 
 export const tagsHtml = (tags = []) =>
   tags.length
@@ -31,8 +88,8 @@ export function dishRow(dish) {
   const qty = cartQty(dish.id);
   const out = !dish.is_active || dish.stock_qty <= 0;
   return `
-  <div class="dish ${out ? 'dish--out' : ''}" data-dish="${dish.id}">
-    <div class="dish__thumb" style="background:${dishGradient(dish)}">${esc(dish.icon)}</div>
+  <a class="dish ${out ? 'dish--out' : ''}" data-dish="${dish.id}" href="#/dish/${dish.id}">
+    ${dishThumb(dish, { sizes: '(min-width: 700px) 96px, 78px' })}
     <div class="dish__body">
       <div class="dish__name">${esc(dish.name)}</div>
       <div class="dish__meta">${dish.weight_g ? `${dish.weight_g} г · ` : ''}${dish.kcal} ккал${
@@ -47,14 +104,14 @@ export function dishRow(dish) {
           ? '<span class="tag">Стоп-лист</span>'
           : qty > 0
             ? `<div class="stepper" data-stepper="${dish.id}">
-                 <button data-minus aria-label="Убрать одну порцию">−</button>
+                 <button type="button" data-minus aria-label="Убрать одну порцию">−</button>
                  <span class="stepper__val">${qty}</span>
-                 <button data-plus aria-label="Добавить порцию" ${qty >= dish.stock_qty ? 'disabled' : ''}>+</button>
+                 <button type="button" data-plus aria-label="Добавить порцию" ${qty >= dish.stock_qty ? 'disabled' : ''}>+</button>
                </div>`
-            : `<button class="add-btn" data-add="${dish.id}" aria-label="Добавить в корзину">+</button>`
+            : `<button type="button" class="add-btn" data-add="${dish.id}" aria-label="Добавить в корзину">+</button>`
       }
     </div>
-  </div>`;
+  </a>`;
 }
 
 /** Изменение количества с оптимистичным откликом. */
@@ -80,6 +137,7 @@ export function bindDishList(root, { onOpen } = {}) {
   root.addEventListener('click', async (event) => {
     const addBtn = event.target.closest('[data-add]');
     if (addBtn) {
+      event.preventDefault();
       event.stopPropagation();
       await changeQty(Number(addBtn.dataset.add), 1);
       return;
@@ -89,89 +147,24 @@ export function bindDishList(root, { onOpen } = {}) {
       const id = Number(stepper.dataset.stepper);
       const current = cartQty(id);
       if (event.target.closest('[data-plus]')) {
+        event.preventDefault();
         event.stopPropagation();
         await changeQty(id, current + 1);
         return;
       }
       if (event.target.closest('[data-minus]')) {
+        event.preventDefault();
         event.stopPropagation();
         await changeQty(id, current - 1);
         return;
       }
     }
     const card = event.target.closest('[data-dish]');
-    if (card && onOpen) onOpen(Number(card.dataset.dish));
+    if (card && onOpen) {
+      event.preventDefault();
+      onOpen(Number(card.dataset.dish));
+    }
   });
-}
-
-/** Подробная карточка блюда в нижнем листе. */
-export function openDishSheet(dishId) {
-  const dish = state.dishes.find((d) => d.id === dishId);
-  if (!dish) return;
-  const qty = cartQty(dish.id);
-  const out = !dish.is_active || dish.stock_qty <= 0;
-
-  openSheet(
-    `<div class="stack">
-      <div style="background:${dishGradient(dish)};border-radius:20px;height:150px;display:grid;place-items:center;font-size:76px">${esc(dish.icon)}</div>
-      <div>
-        <h2 class="section__title" style="font-size:22px;margin-bottom:6px">${esc(dish.name)}</h2>
-        <div class="muted small">${dish.weight_g ? `${dish.weight_g} г · ` : ''}${dish.kcal} ккал</div>
-        ${tagsHtml(dish.tags)}
-      </div>
-      ${dish.description ? `<p class="muted" style="margin:0;font-size:14px">${esc(dish.description)}</p>` : ''}
-      <div class="grid-3">
-        ${[['Белки', dish.protein], ['Жиры', dish.fat], ['Углеводы', dish.carbs]]
-          .map(([label, value]) => `
-            <div class="card center">
-              <div class="small muted">${label}</div>
-              <div class="bold" style="font-size:17px;margin-top:3px">${Number(value)} г</div>
-            </div>`)
-          .join('')}
-      </div>
-      <div class="hstack">
-        <div>
-          <div class="small muted">Цена</div>
-          <div style="font-size:24px;font-weight:900">${money(dish.price)}</div>
-        </div>
-        <div class="spacer"></div>
-        <div class="small muted">${out ? 'Нет в наличии' : `Осталось ${dish.stock_qty} порц.`}</div>
-      </div>
-      ${
-        out
-          ? '<button class="btn" disabled>Сегодня закончилось</button>'
-          : `<div id="sheet-action"></div>`
-      }
-    </div>`,
-    (sheet) => {
-      const host = sheet.querySelector('#sheet-action');
-      if (!host) return;
-
-      const render = () => {
-        const current = cartQty(dish.id);
-        host.innerHTML = current
-          ? `<div class="hstack" style="gap:12px">
-               <div class="stepper" style="flex:0 0 auto">
-                 <button data-m>−</button><span class="stepper__val">${current}</span>
-                 <button data-p ${current >= dish.stock_qty ? 'disabled' : ''}>+</button>
-               </div>
-               <button class="btn" data-go-cart>В корзину · ${money(dish.price * current)}</button>
-             </div>`
-          : '<button class="btn" data-add-one>Добавить в корзину</button>';
-
-        const add = host.querySelector('[data-add-one]');
-        if (add) add.onclick = async () => { if (await changeQty(dish.id, 1)) render(); };
-        const minus = host.querySelector('[data-m]');
-        if (minus) minus.onclick = async () => { if (await changeQty(dish.id, current - 1)) render(); };
-        const plus = host.querySelector('[data-p]');
-        if (plus) plus.onclick = async () => { if (await changeQty(dish.id, current + 1)) render(); };
-        const goCart = host.querySelector('[data-go-cart]');
-        if (goCart) goCart.onclick = () => { closeSheet(); window.location.hash = '#/cart'; };
-      };
-      render();
-    },
-  );
-  return qty;
 }
 
 /** Плашка статуса заказа. */
@@ -180,4 +173,4 @@ export const statusPill = (order) =>
 
 /** Короткое перечисление состава заказа. */
 export const orderSummary = (order) =>
-  order.items.map((i) => `${esc(i.icon)} ${esc(i.name)}${i.qty > 1 ? ` ×${i.qty}` : ''}`).join(' · ');
+  order.items.map((i) => `${esc(i.name)}${i.qty > 1 ? ` ×${i.qty}` : ''}`).join(' · ');

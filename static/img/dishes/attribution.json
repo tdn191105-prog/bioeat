@@ -1,0 +1,418 @@
+{
+  "befstroganov": {
+    "author": "avlxyz",
+    "dish": "Бефстроганов",
+    "license": "CC BY-SA 2.0",
+    "placeholder": "#846b43",
+    "provider": "openverse",
+    "source_url": "https://www.flickr.com/photos/10559879@N00/4703242240"
+  },
+  "bliny-s-dzhemom": {
+    "author": "jeffreyw",
+    "dish": "Блины с джемом",
+    "license": "CC BY 2.0",
+    "placeholder": "#844838",
+    "provider": "openverse",
+    "source_url": "https://www.flickr.com/photos/7927684@N03/4886586256"
+  },
+  "borsch-s-govyadinoy": {
+    "author": "Tanya !",
+    "dish": "Борщ с говядиной",
+    "license": "CC BY 2.0",
+    "placeholder": "#6d483f",
+    "provider": "openverse",
+    "source_url": "https://www.flickr.com/photos/7561141@N04/1807977385"
+  },
+  "bulgur-s-ovoschami": {
+    "author": "jakub_hla",
+    "dish": "Булгур с овощами",
+    "license": "CC BY-SA 2.0",
+    "placeholder": "#545452",
+    "provider": "openverse",
+    "source_url": "https://www.flickr.com/photos/20444618@N00/2465764824"
+  },
+  "chay-chernyy---zelenyy": {
+    "author": "mendhak",
+    "dish": "Чай чёрный / зелёный",
+    "license": "CC BY-SA 2.0",
+    "placeholder": "#3b2a0e",
+    "provider": "openverse",
+    "source_url": "https://www.flickr.com/photos/69135870@N00/2974463970"
+  },
+  "gorohovyy-sup-s-kopchenostyami": {
+    "author": "Qfamily",
+    "dish": "Гороховый суп с копчёностями",
+    "license": "CC BY 2.0",
+    "placeholder": "#683b04",
+    "provider": "openverse",
+    "source_url": "https://www.flickr.com/photos/98545783@N00/2213950065"
+  },
+  "grecheskiy-salat": {
+    "author": "SAS Photographie",
+    "dish": "Греческий салат",
+    "license": "CC BY-ND 2.0",
+    "placeholder": "#5b5433",
+    "provider": "openverse",
+    "source_url": "https://www.flickr.com/photos/34949708@N07/3745781756"
+  },
+  "grechka-otvarnaya": {
+    "author": "KabanDanish",
+    "dish": "Гречка отварная",
+    "license": "CC BY-SA 4.0",
+    "placeholder": "#7d5237",
+    "provider": "wikimedia",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Buckwheat_porridge_in_medvedkovo.jpg"
+  },
+  "hleb-rzhanoy": {
+    "author": "Nemo bis",
+    "dish": "Хлеб ржаной",
+    "license": "CC BY-SA 3.0",
+    "placeholder": "#4a3b30",
+    "provider": "openverse",
+    "source_url": "https://commons.wikimedia.org/w/index.php?curid=29690460"
+  },
+  "kakao": {
+    "author": "4028mdk09",
+    "dish": "Какао",
+    "license": "CC BY-SA 3.0",
+    "placeholder": "#524740",
+    "provider": "wikimedia",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Becher_Kakao_mit_Sahneh%C3%A4ubchen.JPG"
+  },
+  "kapuchino": {
+    "author": "insidious_plots",
+    "dish": "Капучино",
+    "license": "CC BY 2.0",
+    "placeholder": "#4f3f32",
+    "provider": "openverse",
+    "source_url": "https://www.flickr.com/photos/70928775@N00/4561741727"
+  },
+  "kartofel-po-derevenski": {
+    "author": "su-lin",
+    "dish": "Картофель по-деревенски",
+    "license": "CC BY-NC-ND 2.0",
+    "placeholder": "#753b13",
+    "provider": "openverse",
+    "source_url": "https://www.flickr.com/photos/15157510@N00/424483605"
+  },
+  "kartofelnoe-pyure": {
+    "author": "Sm faysal",
+    "dish": "Картофельное пюре",
+    "license": "CC BY-SA 4.0",
+    "placeholder": "#534637",
+    "provider": "wikimedia",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Home_made_Alu_vorta_(Bengali_mashed_potato).jpg"
+  },
+  "kofe-amerikano": {
+    "author": "Nicola since 1972",
+    "dish": "Кофе американо",
+    "license": "CC BY 2.0",
+    "placeholder": "#605f56",
+    "provider": "openverse",
+    "source_url": "https://www.flickr.com/photos/15216811@N06/5128993656"
+  },
+  "kombo--legkiy-pp": {
+    "author": "pointnshoot",
+    "dish": "Комбо «Лёгкий ПП»",
+    "license": "CC BY 2.0",
+    "placeholder": "#86683f",
+    "provider": "openverse",
+    "source_url": "https://www.flickr.com/photos/18244673@N00/1474618098"
+  },
+  "kombo--vegetarianskoe": {
+    "author": "mhaller1979",
+    "dish": "Комбо «Вегетарианское»",
+    "license": "CC BY 2.0",
+    "placeholder": "#524725",
+    "provider": "openverse",
+    "source_url": "https://www.flickr.com/photos/25400848@N04/3456875252"
+  },
+  "kombo--zavtrak": {
+    "author": "Matt@PEK",
+    "dish": "Комбо «Завтрак»",
+    "license": "CC BY-NC-SA 2.0",
+    "placeholder": "#62503c",
+    "provider": "openverse",
+    "source_url": "https://www.flickr.com/photos/21065622@N08/5168721390"
+  },
+  "kompleksnyy-obed--studencheskiy": {
+    "author": "rutlo",
+    "dish": "Комплексный обед «Студенческий»",
+    "license": "CC BY 2.0",
+    "placeholder": "#93794d",
+    "provider": "openverse",
+    "source_url": "https://www.flickr.com/photos/26809429@N02/3970438692"
+  },
+  "kompot-iz-suhofruktov": {
+    "author": "E4024",
+    "dish": "Компот из сухофруктов",
+    "license": "CC BY-SA 4.0",
+    "placeholder": "#715236",
+    "provider": "wikimedia",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Apricot,_plum_and_raisin_ho%C5%9Faf.jpg"
+  },
+  "kotleta-po-kievski": {
+    "author": "Jason Lam",
+    "dish": "Котлета по-киевски",
+    "license": "CC BY-SA 2.0",
+    "placeholder": "#847059",
+    "provider": "openverse",
+    "source_url": "https://commons.wikimedia.org/w/index.php?curid=26185222"
+  },
+  "kotleta-rublenaya-kurinaya": {
+    "author": "moria",
+    "dish": "Котлета рубленая куриная",
+    "license": "CC BY 2.0",
+    "placeholder": "#644a12",
+    "provider": "openverse",
+    "source_url": "https://www.flickr.com/photos/49503029034@N01/2896187141"
+  },
+  "krem-sup-iz-tykvy": {
+    "author": "Cala cala_maffia",
+    "dish": "Крем-суп из тыквы",
+    "license": "CC0",
+    "placeholder": "#a78249",
+    "provider": "wikimedia",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Autumn_Soup_(Unsplash)_cropped.jpg"
+  },
+  "kruassan-klassicheskiy": {
+    "author": "avlxyz",
+    "dish": "Круассан классический",
+    "license": "CC BY-SA 2.0",
+    "placeholder": "#655b56",
+    "provider": "openverse",
+    "source_url": "https://www.flickr.com/photos/10559879@N00/2604189398"
+  },
+  "kurinaya-grudka-gril": {
+    "author": "minnibeach",
+    "dish": "Куриная грудка гриль",
+    "license": "CC BY-NC-ND 2.0",
+    "placeholder": "#644d42",
+    "provider": "openverse",
+    "source_url": "https://www.flickr.com/photos/34735031@N00/1015165922"
+  },
+  "kurinyy-sup-s-lapshoy": {
+    "author": "avlxyz",
+    "dish": "Куриный суп с лапшой",
+    "license": "CC BY-SA 2.0",
+    "placeholder": "#646446",
+    "provider": "openverse",
+    "source_url": "https://www.flickr.com/photos/10559879@N00/2597730170"
+  },
+  "latte": {
+    "author": "avlxyz",
+    "dish": "Латте",
+    "license": "CC BY-SA 2.0",
+    "placeholder": "#4b4338",
+    "provider": "openverse",
+    "source_url": "https://www.flickr.com/photos/10559879@N00/4198676685"
+  },
+  "makarony-otvarnye": {
+    "author": "Fimb",
+    "dish": "Макароны отварные",
+    "license": "CC BY 2.0",
+    "placeholder": "#885e47",
+    "provider": "openverse",
+    "source_url": "https://www.flickr.com/photos/48573253@N00/3281950699"
+  },
+  "morkov-po-koreyski": {
+    "author": "Kf8",
+    "dish": "Морковь по-корейски",
+    "license": "CC0",
+    "placeholder": "#a47f6b",
+    "provider": "wikimedia",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Corean_carrot_salad.jpg"
+  },
+  "mors-klyukvennyy": {
+    "author": "Victor Wong (sfe-co2)",
+    "dish": "Морс клюквенный",
+    "license": "CC BY-NC-SA 2.0",
+    "placeholder": "#6d5c48",
+    "provider": "openverse",
+    "source_url": "https://www.flickr.com/photos/97403714@N02/31094819518"
+  },
+  "ovoschi-gril": {
+    "author": "angrywayne",
+    "dish": "Овощи гриль",
+    "license": "CC BY-NC-ND 2.0",
+    "placeholder": "#806848",
+    "provider": "openverse",
+    "source_url": "https://www.flickr.com/photos/51035796924@N01/2689067877"
+  },
+  "ovoschnoe-ragu": {
+    "author": "avlxyz",
+    "dish": "Овощное рагу",
+    "license": "CC BY-SA 2.0",
+    "placeholder": "#7b5a43",
+    "provider": "openverse",
+    "source_url": "https://www.flickr.com/photos/10559879@N00/1221497455"
+  },
+  "ovsyanoe-pechene": {
+    "author": "Phoebe Lim",
+    "dish": "Овсяное печенье",
+    "license": "CC BY-SA 2.0",
+    "placeholder": "#805f36",
+    "provider": "openverse",
+    "source_url": "https://www.flickr.com/photos/71837271@N00/8608450939"
+  },
+  "pasta-karbonara": {
+    "author": "stu_spivack",
+    "dish": "Паста карбонара",
+    "license": "CC BY-SA 2.0",
+    "placeholder": "#7a7562",
+    "provider": "openverse",
+    "source_url": "https://www.flickr.com/photos/35034346243@N01/34677096"
+  },
+  "picca--pepperoni--kusok": {
+    "author": "BrokenSphere",
+    "dish": "Пицца «Пепперони», кусок",
+    "license": "CC BY-SA 3.0",
+    "placeholder": "#664f42",
+    "provider": "openverse",
+    "source_url": "https://commons.wikimedia.org/w/index.php?curid=8557016"
+  },
+  "pirozhok-s-kapustoy": {
+    "author": "Miha Ulanov",
+    "dish": "Пирожок с капустой",
+    "license": "CC BY-SA 3.0",
+    "placeholder": "#956b40",
+    "provider": "openverse",
+    "source_url": "https://commons.wikimedia.org/w/index.php?curid=5863028"
+  },
+  "plov-s-baraninoy": {
+    "author": "Arthur Chapman",
+    "dish": "Плов с бараниной",
+    "license": "CC BY-NC-SA 2.0",
+    "placeholder": "#6b4d2e",
+    "provider": "openverse",
+    "source_url": "https://www.flickr.com/photos/32005048@N06/4584708193"
+  },
+  "ris-pripuschennyy": {
+    "author": "Afifa Afrin",
+    "dish": "Рис припущенный",
+    "license": "CC BY-SA 4.0",
+    "placeholder": "#46403b",
+    "provider": "wikimedia",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Boiled_rice.jpg"
+  },
+  "salat--cezar--s-kuricey": {
+    "author": "avlxyz",
+    "dish": "Салат «Цезарь» с курицей",
+    "license": "CC BY-SA 2.0",
+    "placeholder": "#594f26",
+    "provider": "openverse",
+    "source_url": "https://www.flickr.com/photos/10559879@N00/4732604807"
+  },
+  "salat--olive": {
+    "author": "AlMare",
+    "dish": "Салат «Оливье»",
+    "license": "CC BY 2.5",
+    "placeholder": "#837358",
+    "provider": "openverse",
+    "source_url": "https://commons.wikimedia.org/w/index.php?curid=3294513"
+  },
+  "schi-iz-svezhey-kapusty": {
+    "author": "Victoria Vasilieva",
+    "dish": "Щи из свежей капусты",
+    "license": "CC BY-SA 2.0",
+    "placeholder": "#6d3725",
+    "provider": "openverse",
+    "source_url": "https://commons.wikimedia.org/w/index.php?curid=46297592"
+  },
+  "sharlotka-yablochnaya": {
+    "author": "arsheffield",
+    "dish": "Шарлотка яблочная",
+    "license": "CC BY-NC 2.0",
+    "placeholder": "#7a6c60",
+    "provider": "openverse",
+    "source_url": "https://www.flickr.com/photos/82304216@N00/6810656843"
+  },
+  "sloyka-s-tvorogom": {
+    "author": "cacaobug",
+    "dish": "Слойка с творогом",
+    "license": "CC BY-NC-ND 2.0",
+    "placeholder": "#6b5f4f",
+    "provider": "openverse",
+    "source_url": "https://www.flickr.com/photos/21619548@N02/2193156474"
+  },
+  "solyanka-myasnaya": {
+    "author": "Benreis",
+    "dish": "Солянка мясная",
+    "license": "CC BY-SA 4.0",
+    "placeholder": "#7b5f4d",
+    "provider": "wikimedia",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Fischsolianka_Schifferkrug_Kuhle.jpg"
+  },
+  "sosiska-v-teste": {
+    "author": "Andy Li",
+    "dish": "Сосиска в тесте",
+    "license": "CC0",
+    "placeholder": "#686460",
+    "provider": "wikimedia",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Pork,_Cheddar_Cheese_%26_Chutney_Sausage_Roll_-_Cafe_Coho_2026-07-08.jpg"
+  },
+  "syrniki-so-smetanoy": {
+    "author": "say_cheddar",
+    "dish": "Сырники со сметаной",
+    "license": "CC BY 2.0",
+    "placeholder": "#815c4b",
+    "provider": "openverse",
+    "source_url": "https://www.flickr.com/photos/29271559@N02/26062281686"
+  },
+  "tefteli-v-tomatnom-souse": {
+    "author": "Andy Li",
+    "dish": "Тефтели в томатном соусе",
+    "license": "CC0",
+    "placeholder": "#887160",
+    "provider": "openverse",
+    "source_url": "https://commons.wikimedia.org/w/index.php?curid=191058244"
+  },
+  "treska-zapechennaya": {
+    "author": "Blue moon in her eyes",
+    "dish": "Треска запечённая",
+    "license": "CC BY-NC-SA 2.0",
+    "placeholder": "#686a5d",
+    "provider": "openverse",
+    "source_url": "https://www.flickr.com/photos/58533294@N00/7865279962"
+  },
+  "vatrushka-s-tvorogom": {
+    "author": "Steven Pavlov",
+    "dish": "Ватрушка с творогом",
+    "license": "CC BY-SA 3.0",
+    "placeholder": "#715012",
+    "provider": "openverse",
+    "source_url": "https://commons.wikimedia.org/w/index.php?curid=17232236"
+  },
+  "vinegret": {
+    "author": "avlxyz",
+    "dish": "Винегрет",
+    "license": "CC BY-SA 2.0",
+    "placeholder": "#908d76",
+    "provider": "openverse",
+    "source_url": "https://www.flickr.com/photos/10559879@N00/307602959"
+  },
+  "vitaminnyy-salat": {
+    "author": "avlxyz",
+    "dish": "Витаминный салат",
+    "license": "CC BY-SA 2.0",
+    "placeholder": "#746648",
+    "provider": "openverse",
+    "source_url": "https://www.flickr.com/photos/10559879@N00/4004743372"
+  },
+  "voda-pitevaya-0-5-l": {
+    "author": "Muffet",
+    "dish": "Вода питьевая 0,5 л",
+    "license": "CC BY 2.0",
+    "placeholder": "#303238",
+    "provider": "openverse",
+    "source_url": "https://www.flickr.com/photos/53133240@N00/7985698964"
+  },
+  "yogurt-naturalnyy": {
+    "author": "Missvain",
+    "dish": "Йогурт натуральный",
+    "license": "CC BY 4.0",
+    "placeholder": "#645b55",
+    "provider": "wikimedia",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Granola_and_yogurt_-_Bubbles_%2B_Brunch_2018_-_Sarah_Stierch_02_cropped.jpg"
+  }
+}

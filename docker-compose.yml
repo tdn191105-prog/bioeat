@@ -29,7 +29,11 @@ services:
       TZ_OFFSET_HOURS: 3
     ports:
       - "8000:8000"
+    volumes:
+      # загруженные из админки фото должны переживать пересборку образа
+      - bioeat-uploads:/srv/static/uploads
     restart: unless-stopped
 
 volumes:
   bioeat-pgdata:
+  bioeat-uploads:

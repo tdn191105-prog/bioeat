@@ -1,16 +1,23 @@
 """Админ-панель: управление меню, слотами, пользователями и отчётами."""
 from __future__ import annotations
 
-import re
 from datetime import date, time
 from decimal import Decimal
+from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_session
 from ..deps import admin_required
+from ..images import (
+    ALLOWED_CONTENT_TYPES,
+    MAX_UPLOAD_BYTES,
+    ImageError,
+    process,
+    save_pair,
+)
 from ..models import (
     ACTIVE_STATUSES,
     CartItem,
@@ -35,24 +42,16 @@ from ..schemas import (
     StatsOut,
     UserOut,
 )
+from ..reference import slugify
 from ..security import hash_password
 from ..services import campus_today, money, slots_payload
 
 router = APIRouter(prefix="/api/admin", tags=["admin"], dependencies=[Depends(admin_required)])
 
-TRANSLIT = {
-    "а": "a", "б": "b", "в": "v", "г": "g", "д": "d", "е": "e", "ё": "e", "ж": "zh",
-    "з": "z", "и": "i", "й": "y", "к": "k", "л": "l", "м": "m", "н": "n", "о": "o",
-    "п": "p", "р": "r", "с": "s", "т": "t", "у": "u", "ф": "f", "х": "h", "ц": "c",
-    "ч": "ch", "ш": "sh", "щ": "sch", "ъ": "", "ы": "y", "ь": "", "э": "e", "ю": "yu",
-    "я": "ya", " ": "-",
-}
-
-
-def slugify(value: str) -> str:
-    text = "".join(TRANSLIT.get(ch, ch) for ch in value.lower())
-    text = re.sub(r"[^a-z0-9-]+", "-", text).strip("-")
-    return text or "category"
+# Загруженные админом фото лежат отдельно от скачанных скриптом:
+# папка не в git и подключена томом, чтобы пережить пересборку контейнера.
+UPLOAD_DIR = Path(__file__).resolve().parent.parent.parent / "static" / "uploads" / "dishes"
+UPLOAD_URL_PREFIX = "/static/uploads/dishes"
 
 
 def parse_time(value: str) -> time:
@@ -211,6 +210,83 @@ async def set_stock(
     if dish is None:
         raise HTTPException(status_code=404, detail="Блюдо не найдено")
     dish.stock_qty = qty
+    await session.commit()
+    await session.refresh(dish)
+    return dish
+
+
+# --------------------------------------------------------------------------- #
+#  Фотография блюда
+# --------------------------------------------------------------------------- #
+@router.post("/dishes/{dish_id}/image", response_model=DishOut)
+async def upload_dish_image(
+    dish_id: int,
+    file: UploadFile = File(...),
+    session: AsyncSession = Depends(get_session),
+):
+    """Загрузка фотографии блюда из админ-панели.
+
+    Обработка та же, что и в скрипте массовой загрузки (кроп 4:3, WebP
+    800×600 и 400×300, доминирующий цвет) — код живёт в app/images.py.
+    """
+    dish = await session.get(Dish, dish_id)
+    if dish is None:
+        raise HTTPException(status_code=404, detail="Блюдо не найдено")
+
+    if file.content_type not in ALLOWED_CONTENT_TYPES:
+        raise HTTPException(
+            status_code=415,
+            detail="Поддерживаются только JPEG, PNG и WebP",
+        )
+
+    raw = await file.read()
+    if len(raw) > MAX_UPLOAD_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Файл {len(raw) / 1024 / 1024:.1f} МБ — это больше допустимых 8 МБ",
+        )
+
+    # заголовку Content-Type и расширению не верим: формат проверяет Pillow
+    try:
+        processed = process(raw)
+    except ImageError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    slug = slugify(dish.name, fallback=f"dish-{dish.id}")
+    # версия в имени файла сбрасывает кэш браузера при замене фото
+    name = f"{slug}-{dish.id}"
+    save_pair(processed, UPLOAD_DIR, name)
+
+    dish.image_url = f"{UPLOAD_URL_PREFIX}/{name}.webp"
+    dish.image_thumb_url = f"{UPLOAD_URL_PREFIX}/{name}-thumb.webp"
+    dish.image_placeholder = processed.placeholder
+    dish.image_author = "Столовая РОСБИОТЕХ"
+    dish.image_license = "Собственный снимок"
+    dish.image_source_url = ""
+    await session.commit()
+    await session.refresh(dish)
+    return dish
+
+
+@router.delete("/dishes/{dish_id}/image", response_model=DishOut)
+async def delete_dish_image(dish_id: int, session: AsyncSession = Depends(get_session)):
+    """Сбрасывает фото: в списках блюдо снова показывается иконкой категории."""
+    dish = await session.get(Dish, dish_id)
+    if dish is None:
+        raise HTTPException(status_code=404, detail="Блюдо не найдено")
+
+    # чужие файлы (скачанные скриптом в static/img) не трогаем — только свои загрузки
+    if dish.image_url.startswith(UPLOAD_URL_PREFIX):
+        stem = Path(dish.image_url).stem
+        for path in (UPLOAD_DIR / f"{stem}.webp", UPLOAD_DIR / f"{stem}-thumb.webp"):
+            path.unlink(missing_ok=True)
+
+    dish.image_url = ""
+    dish.image_thumb_url = ""
+    dish.image_placeholder = ""
+    dish.image_author = ""
+    dish.image_license = ""
+    dish.image_source_url = ""
     await session.commit()
     await session.refresh(dish)
     return dish

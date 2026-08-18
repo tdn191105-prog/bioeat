@@ -13,7 +13,7 @@ from pathlib import Path
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .db import SessionLocal, create_all, ensure_columns
+from .db import SessionLocal, create_all, engine, ensure_columns
 from .dish_details import DISH_DETAILS
 from .models import Category, Dish, PickupSlot, User, UserRole
 from .reference import slugify
@@ -317,6 +317,7 @@ async def main() -> None:
     async with SessionLocal() as session:
         result = await seed(session)
     print("Seed:", result)
+    await engine.dispose()
 
 
 if __name__ == "__main__":

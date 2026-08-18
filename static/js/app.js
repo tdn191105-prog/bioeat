@@ -5,6 +5,7 @@ import { esc, toast, go, closeSheet } from './ui.js';
 const ROUTES = {
   '/': () => import('./views/home.js'),
   '/menu': () => import('./views/menu.js'),
+  '/dish/:id': () => import('./views/dish.js'),
   '/cart': () => import('./views/cart.js'),
   '/checkout': () => import('./views/checkout.js'),
   '/orders': () => import('./views/orders.js'),
@@ -26,6 +27,10 @@ const NAV = [
 
 const BACKABLE = ['/checkout', '/cart', '/profile'];
 
+/* Позиция прокрутки меню: вернувшись из карточки блюда, пользователь должен
+   оказаться там же, где нажал, а не в начале длинного списка. */
+const scrollMemory = new Map();
+
 const el = {
   app: document.getElementById('app'),
   rail: document.getElementById('rail'),
@@ -39,6 +44,7 @@ const el = {
 };
 
 let currentView = null;
+let previousPath = parseHash().path;
 
 /* ------------------------------ Разбор пути ------------------------------- */
 function parseHash() {
@@ -164,6 +170,8 @@ async function render() {
   el.back.style.visibility = BACKABLE.includes(path) || path.startsWith('/pay') || path.startsWith('/order/')
     ? 'visible'
     : 'hidden';
+  // у карточки блюда своя кнопка «назад» поверх фото
+  if (path.startsWith('/dish/')) el.back.style.visibility = 'hidden';
 
   el.content.innerHTML = view.html || '';
   window.scrollTo(0, 0);
@@ -181,6 +189,10 @@ async function render() {
       toast('Ошибка при загрузке экрана', 'err');
     }
   }
+
+  // восстанавливаем прокрутку только после mount — до него список ещё пуст
+  const remembered = scrollMemory.get(path);
+  if (remembered) requestAnimationFrame(() => window.scrollTo(0, remembered));
 
   renderNav(path);
   updateBell();
@@ -219,7 +231,12 @@ subscribe(() => {
   updateBell();
 });
 
-window.addEventListener('hashchange', render);
+window.addEventListener('hashchange', () => {
+  // запоминаем, где был пользователь, до перерисовки на новый маршрут
+  scrollMemory.set(previousPath, window.scrollY);
+  previousPath = parseHash().path;
+  render();
+});
 
 /* ------------------------------ Запуск ----------------------------------- */
 (async function boot() {
