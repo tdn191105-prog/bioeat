@@ -17,7 +17,7 @@ from datetime import timedelta
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .db import SessionLocal, create_all
+from .db import SessionLocal, create_all, engine, ensure_columns
 from .models import (
     Dish,
     Order,
@@ -187,14 +187,19 @@ async def reset(session: AsyncSession) -> int:
 
 async def main() -> None:
     await create_all()
-    async with SessionLocal() as session:
-        await seed(session)
-        if "--reset" in sys.argv:
-            removed = await reset(session)
-            print(f"Удалено демо-заказов: {removed}")
-            return
-        result = await generate(session)
-    print("Демо-данные:", result)
+    await ensure_columns()
+    try:
+        async with SessionLocal() as session:
+            await seed(session)
+            if "--reset" in sys.argv:
+                removed = await reset(session)
+                print(f"Удалено демо-заказов: {removed}")
+                return
+            result = await generate(session)
+        print("Демо-данные:", result)
+    finally:
+        # без этого рабочий поток aiosqlite не даёт процессу завершиться
+        await engine.dispose()
 
 
 if __name__ == "__main__":

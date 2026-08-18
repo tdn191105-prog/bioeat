@@ -1,6 +1,7 @@
 /* Админ-панель: меню, категории, окна выдачи, сотрудники, отчёты. */
-import api from '../api.js';
+import api, { auth, ApiError } from '../api.js';
 import { loadMenu, state } from '../state.js';
+import { dishThumb } from '../components.js';
 import {
   esc, money, toast, openSheet, closeSheet, confirmSheet, skeletonList, empty,
   TAG_LABELS, isoDate, dateLabel,
@@ -15,11 +16,39 @@ const TABS = [
 ];
 
 const ALL_TAGS = ['pp', 'veg', 'no_lactose', 'no_gluten', 'spicy', 'hit'];
+
+/** Загрузка фото — multipart, поэтому мимо обёртки api (она шлёт JSON). */
+async function uploadDishImage(dishId, file) {
+  const body = new FormData();
+  body.append('file', file);
+  const headers = {};
+  if (auth.token) headers.Authorization = `Bearer ${auth.token}`;
+
+  let response;
+  try {
+    response = await fetch(`/api/admin/dishes/${dishId}/image`, { method: 'POST', headers, body });
+  } catch {
+    throw new ApiError('Нет связи с сервером. Проверьте подключение.', 0);
+  }
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new ApiError((payload && payload.detail) || 'Не удалось загрузить фото', response.status);
+  }
+  return payload;
+}
+
 const ICONS = ['🍲','🍗','🥗','🍚','🥐','☕','🍰','🍱','🍜','🥘','🍕','🌭','🥞','🍎','🥛','💧','🍪','🐟','🥩','🍟','🥦','🥕','🫒','🍫','🍹','🧀','🥟','🍳','🥙','🎃'];
 
 export default async function adminView() {
   let tab = 'menu';
   let categories = [];
+  // справочник аллергенов тянем с сервера, чтобы названия не дублировались
+  let allergenBook = [];
+  try {
+    allergenBook = await api.get('/api/reference/allergens');
+  } catch {
+    allergenBook = [];
+  }
 
   return {
     title: 'Админ-панель',
@@ -44,6 +73,7 @@ export default async function adminView() {
 
       /* ----------------------------- Меню ---------------------------------- */
       const dishForm = (dish = null) => {
+        const allergens = allergenBook;
         const isNew = !dish;
         const value = dish || {
           category_id: categories[0]?.id, name: '', description: '', price: '',
@@ -51,7 +81,9 @@ export default async function adminView() {
           tags: [], stock_qty: 50, is_active: true, sort_order: 0,
         };
         let selectedTags = [...(value.tags || [])];
+        let selectedAllergens = [...(value.allergens || [])];
         let selectedIcon = value.icon;
+        let current = dish;
 
         openSheet(
           `<div class="stack">
@@ -110,10 +142,51 @@ export default async function adminView() {
                 <input class="input" id="f-c" type="number" inputmode="decimal" min="0" step="0.1" value="${Number(value.carbs)}">
               </div>
             </div>
+            ${
+              isNew
+                ? `<div class="small muted" style="padding-left:2px">
+                     Фотографию можно будет загрузить сразу после сохранения блюда.
+                   </div>`
+                : `<div class="field">
+                     <span class="field__label">Фотография</span>
+                     <div class="img-upload" id="f-image">
+                       <div class="img-upload__preview" id="f-image-preview"></div>
+                       <div class="img-upload__actions">
+                         <input type="file" id="f-image-file" accept="image/jpeg,image/png,image/webp">
+                         <button type="button" class="btn btn--ghost btn--sm" id="f-image-pick" style="width:100%">
+                           Загрузить фото
+                         </button>
+                         <button type="button" class="btn btn--danger btn--sm" id="f-image-del" style="width:100%">
+                           Убрать фото
+                         </button>
+                         <div class="img-upload__hint">
+                           JPEG, PNG или WebP до 8 МБ. Обрежем по центру до 4:3
+                           и сохраним в WebP двумя размерами.
+                         </div>
+                       </div>
+                     </div>
+                   </div>`
+            }
             <div class="field">
               <span class="field__label">Метки диеты</span>
               <div class="chips" id="f-tags">
                 ${ALL_TAGS.map((t) => `<button type="button" class="chip chip--filter ${selectedTags.includes(t) ? 'is-active' : ''}" data-tag="${t}">${esc(TAG_LABELS[t])}</button>`).join('')}
+              </div>
+            </div>
+            <div class="field">
+              <label class="field__label" for="f-ingredients">Состав — по одному ингредиенту в строке</label>
+              <textarea class="input" id="f-ingredients" rows="5"
+                placeholder="говядина&#10;свёкла&#10;картофель">${esc((value.ingredients || []).join('\n'))}</textarea>
+            </div>
+            <div class="field">
+              <span class="field__label">Аллергены по ТР ТС 022/2011</span>
+              <div class="chips" id="f-allergens">
+                ${allergens
+                  .map(
+                    (a) => `<button type="button" class="chip ${selectedAllergens.includes(a.code) ? 'is-active' : ''}"
+                                    data-allergen="${esc(a.code)}">${esc(a.icon)} ${esc(a.short)}</button>`,
+                  )
+                  .join('')}
               </div>
             </div>
             <button class="btn" id="f-save">${isNew ? 'Добавить в меню' : 'Сохранить'}</button>
@@ -127,6 +200,69 @@ export default async function adminView() {
               sheet.querySelectorAll('[data-icon]').forEach((b) =>
                 b.classList.toggle('is-active', b.dataset.icon === selectedIcon));
             };
+            /* --- фотография --- */
+            const imageHost = sheet.querySelector('#f-image-preview');
+            const renderImage = () => {
+              if (!imageHost) return;
+              imageHost.innerHTML = dishThumb(current, { width: 400, height: 300 });
+              const del = sheet.querySelector('#f-image-del');
+              if (del) del.disabled = !current.image_url;
+            };
+            renderImage();
+
+            const fileInput = sheet.querySelector('#f-image-file');
+            const pick = sheet.querySelector('#f-image-pick');
+            if (pick && fileInput) {
+              pick.onclick = () => fileInput.click();
+              fileInput.onchange = async () => {
+                const file = fileInput.files && fileInput.files[0];
+                if (!file) return;
+                pick.disabled = true;
+                pick.textContent = 'Загружаем…';
+                try {
+                  current = await uploadDishImage(current.id, file);
+                  renderImage();
+                  toast('Фотография обновлена', 'ok');
+                  await loadMenu(true);
+                } catch (err) {
+                  toast(err.message, 'err');
+                } finally {
+                  pick.disabled = false;
+                  pick.textContent = 'Загрузить фото';
+                  fileInput.value = '';
+                }
+              };
+            }
+
+            const delImage = sheet.querySelector('#f-image-del');
+            if (delImage) {
+              delImage.onclick = async () => {
+                delImage.disabled = true;
+                try {
+                  current = await api.del(`/api/admin/dishes/${current.id}/image`);
+                  renderImage();
+                  toast('Фото убрано — покажем иконку категории', 'ok');
+                  await loadMenu(true);
+                } catch (err) {
+                  toast(err.message, 'err');
+                  delImage.disabled = false;
+                }
+              };
+            }
+
+            const allergensHost = sheet.querySelector('#f-allergens');
+            if (allergensHost) {
+              allergensHost.onclick = (e) => {
+                const btn = e.target.closest('[data-allergen]');
+                if (!btn) return;
+                const code = btn.dataset.allergen;
+                selectedAllergens = selectedAllergens.includes(code)
+                  ? selectedAllergens.filter((x) => x !== code)
+                  : [...selectedAllergens, code];
+                btn.classList.toggle('is-active');
+              };
+            }
+
             sheet.querySelector('#f-tags').onclick = (e) => {
               const btn = e.target.closest('[data-tag]');
               if (!btn) return;
@@ -151,6 +287,9 @@ export default async function adminView() {
                 carbs: num('#f-c'),
                 icon: selectedIcon,
                 tags: selectedTags,
+                ingredients: sheet.querySelector('#f-ingredients').value
+                  .split('\n').map((x) => x.trim()).filter(Boolean),
+                allergens: selectedAllergens,
                 stock_qty: num('#f-stock'),
               };
               if (!payload.name) { toast('Введите название', 'err'); return; }

@@ -75,6 +75,27 @@ export default async function checkoutView() {
           return;
         }
         const anyAvailable = form.slots.some((s) => s.is_available);
+
+        /* Полоса заполненности: число «свободно 12» само по себе ни о чём
+           не говорит — рядом нужен масштаб и словесная оценка. */
+        const loadBar = (slot) => {
+          const share = slot.capacity ? Math.min(100, Math.round((slot.taken / slot.capacity) * 100)) : 0;
+          const level = slot.left <= 0 ? 'full' : share >= 80 ? 'warn' : '';
+          const words = slot.left <= 0
+            ? 'мест нет'
+            : share >= 80
+              ? 'почти заполнено'
+              : share >= 50
+                ? 'заполняется'
+                : 'свободно';
+          return `
+            <div class="slot-load">
+              <div class="slot-load__track">
+                <span class="slot-load__fill ${level ? `slot-load__fill--${level}` : ''}" style="width:${share}%"></span>
+              </div>
+              <span class="slot-load__text">${esc(words)} · ${slot.left} из ${slot.capacity}</span>
+            </div>`;
+        };
         slotsHost.innerHTML = `
           ${
             anyAvailable
@@ -86,21 +107,16 @@ export default async function checkoutView() {
           ${form.slots
             .map(
               (s) => `
-              <button class="option ${form.slotId === s.id ? 'is-active' : ''}"
+              <button class="option option--slot ${form.slotId === s.id ? 'is-active' : ''}"
                       data-slot="${s.id}" ${s.is_available ? '' : 'disabled'}>
                 <span class="option__ico">${s.left > 10 ? '🕐' : '⏳'}</span>
                 <span class="option__body">
                   <span class="option__title">${esc(s.label)} · ${esc(s.time_range)}</span>
                   <span class="option__sub">${esc(s.point)}</span>
+                  ${loadBar(s)}
                 </span>
                 <span class="option__right">
-                  ${
-                    s.is_available
-                      ? `свободно<br><b style="color:var(--green)">${s.left}</b>`
-                      : s.left <= 0
-                        ? 'мест нет'
-                        : 'закрыто'
-                  }
+                  ${s.is_available ? '' : s.left <= 0 ? 'мест нет' : 'закрыто'}
                 </span>
               </button>`,
             )

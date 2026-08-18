@@ -1,7 +1,8 @@
 /* Главный экран — витрина сервисов в стиле приложения РОСБИОТЕХ. */
+import api from '../api.js';
 import { state, loadMenu, loadActiveOrders, isStaff, isAdmin } from '../state.js';
 import { esc, money, plural, go, dateLabel, skeletonList } from '../ui.js';
-import { dishRow, bindDishList, openDishSheet, statusPill } from '../components.js';
+import { dishRow, bindDishList } from '../components.js';
 
 const NEWS = [
   {
@@ -237,11 +238,17 @@ export default async function homeView() {
 
       root.querySelector('#tiles').innerHTML = tilesHtml();
 
-      const hits = state.dishes.filter((d) => (d.tags || []).includes('hit')).slice(0, 4);
-      const list = hits.length ? hits : state.dishes.slice(0, 4);
+      // «Хиты недели» — по фактическим продажам за неделю; сервер сам
+      // откатится на тег hit, если продаж ещё не было
       const hitsHost = root.querySelector('#hits');
-      hitsHost.innerHTML = list.map(dishRow).join('');
-      bindDishList(hitsHost, { onOpen: openDishSheet });
+      let hits = [];
+      try {
+        hits = await api.get('/api/dishes/popular?limit=4');
+      } catch {
+        hits = state.dishes.filter((d) => (d.tags || []).includes('hit')).slice(0, 4);
+      }
+      hitsHost.innerHTML = (hits.length ? hits : state.dishes.slice(0, 4)).map(dishRow).join('');
+      bindDishList(hitsHost, { onOpen: (id) => go(`#/dish/${id}`) });
 
       root.addEventListener('click', (event) => {
         const target = event.target.closest('[data-goto]');

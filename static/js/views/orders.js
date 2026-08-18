@@ -1,7 +1,32 @@
 /* История заказов. */
 import api from '../api.js';
+import { loadCart } from '../state.js';
 import { esc, money, empty, go, dateLabel, skeletonList, toast } from '../ui.js';
 import { statusPill, orderSummary } from '../components.js';
+
+/** Кладёт состав прошлого заказа в корзину и честно рассказывает, что пропущено. */
+export async function repeatOrder(orderId, button) {
+  const label = button ? button.textContent : '';
+  if (button) { button.disabled = true; button.textContent = 'Добавляем…'; }
+  try {
+    const result = await api.post(`/api/orders/${orderId}/repeat`);
+    await loadCart();
+    if (!result.added.length) {
+      toast('Ни одну позицию из заказа сегодня взять нельзя', 'err');
+    } else if (result.skipped.length) {
+      const missed = result.skipped.map((s) => `${s.name} (${s.reason})`).join('; ');
+      toast(`Добавлено ${result.added.length}. Пропущено: ${missed}`, 'err');
+    } else {
+      toast(`Заказ повторён · ${result.added.length} поз. в корзине`, 'ok');
+    }
+    return result;
+  } catch (err) {
+    toast(err.message, 'err');
+    return null;
+  } finally {
+    if (button) { button.disabled = false; button.textContent = label; }
+  }
+}
 
 export default async function ordersView() {
   return {
@@ -30,7 +55,8 @@ export default async function ordersView() {
         const past = orders.filter((o) => ['issued', 'cancelled'].includes(o.status));
 
         const card = (order) => `
-          <button class="section" data-goto="#/order/${order.id}" style="text-align:left;width:100%">
+        <section class="section">
+          <div data-goto="#/order/${order.id}" style="text-align:left;width:100%;cursor:pointer">
             <div class="hstack" style="margin-bottom:10px">
               <div>
                 <div class="bold" style="font-size:17px">${esc(order.number)}</div>
@@ -51,7 +77,13 @@ export default async function ordersView() {
                     : '<span class="small muted">Подробнее →</span>'
               }
             </div>
-          </button>`;
+          </div>
+          ${
+            ['issued', 'cancelled'].includes(order.status)
+              ? `<button class="btn btn--ghost btn--sm mt-8" data-repeat="${order.id}">↻ Повторить заказ</button>`
+              : ''
+          }
+        </section>`;
 
         host.innerHTML = `
           ${
@@ -68,7 +100,13 @@ export default async function ordersView() {
           }`;
       }
 
-      host.addEventListener('click', (e) => {
+      host.addEventListener('click', async (e) => {
+        const repeat = e.target.closest('[data-repeat]');
+        if (repeat) {
+          e.stopPropagation();
+          if (await repeatOrder(Number(repeat.dataset.repeat), repeat)) go('#/cart');
+          return;
+        }
         const link = e.target.closest('[data-goto]');
         if (link) go(link.dataset.goto);
       });
