@@ -452,7 +452,7 @@ a { color: inherit; text-decoration: none; }
 
 .dish {
   display: grid;
-  grid-template-columns: 68px 1fr auto;
+  grid-template-columns: 96px 1fr auto;
   gap: 12px;
   align-items: center;
   background: var(--surface);
@@ -466,7 +466,7 @@ a { color: inherit; text-decoration: none; }
 .dish--out { opacity: 0.45; }
 
 .dish__thumb {
-  width: 68px; height: 68px;
+  width: 96px; height: 96px;
   border-radius: 15px;
   display: grid;
   place-items: center;
@@ -1106,7 +1106,7 @@ table.data tbody tr:hover { background: rgba(255, 255, 255, 0.025); }
   filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.25));
 }
 
-.dish-img--mini { width: 46px; border-radius: 11px; }
+.dish-img--mini { width: 54px; border-radius: 11px; }
 .dish-img--mini .cat-ico { width: 58%; height: 58%; }
 
 .dish-img--hero {
@@ -1119,12 +1119,18 @@ table.data tbody tr:hover { background: rgba(255, 255, 255, 0.025); }
 /* --------------------------------------------------------------------------
  *  Карточка блюда
  * -------------------------------------------------------------------------- */
-.dish-page { display: flex; flex-direction: column; gap: 12px; }
+.dish-page {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  /* под липкой панелью покупки должно оставаться место */
+  padding-bottom: 58px;
+}
 
 .dish-hero {
   position: relative;
   /* фото во всю ширину экрана, за пределами отступов .content */
-  margin: calc(-1 * (var(--safe-top) + 62px)) -12px 0;
+  margin: 0 -12px;
 }
 .dish-hero::after {
   content: "";
@@ -1136,8 +1142,8 @@ table.data tbody tr:hover { background: rgba(255, 255, 255, 0.025); }
 }
 .dish-hero__back {
   position: absolute;
-  top: calc(var(--safe-top) + 14px);
-  left: 14px;
+  top: 12px;
+  left: 12px;
   z-index: 2;
   width: 40px; height: 40px;
   border-radius: 50%;
@@ -1302,7 +1308,13 @@ table.data tbody tr:hover { background: rgba(255, 255, 255, 0.025); }
 
 /* Липкая панель покупки */
 .buy-bar { display: flex; align-items: center; gap: 10px; }
-.buy-bar .btn { flex: 1; box-shadow: 0 10px 28px rgba(0, 0, 0, 0.55); }
+.buy-bar .btn {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  padding: 16px 12px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.55);
+}
 .stepper--lg {
   background: rgba(30, 30, 36, 0.92);
   backdrop-filter: blur(16px);
@@ -1317,9 +1329,12 @@ table.data tbody tr:hover { background: rgba(255, 255, 255, 0.025); }
 /* --------------------------------------------------------------------------
  *  Меню: липкие заголовки категорий
  * -------------------------------------------------------------------------- */
+.cat-group { display: flex; flex-direction: column; gap: 10px; }
+
 .cat-head {
   position: sticky;
-  top: calc(var(--safe-top) + 52px);
+  /* под шапкой и под липким рядом категорий */
+  top: calc(var(--safe-top) + 112px);
   z-index: 20;
   margin: 10px 0 2px;
   padding: 9px 10px;
@@ -1348,13 +1363,12 @@ table.data tbody tr:hover { background: rgba(255, 255, 255, 0.025); }
 
 .menu-sticky {
   position: sticky;
-  top: calc(var(--safe-top) + 0px);
+  /* шапка приложения занимает примерно safe-top + 62px */
+  top: calc(var(--safe-top) + 62px);
   z-index: 30;
-  background: linear-gradient(180deg, var(--bg) 78%, transparent);
-  padding-bottom: 6px;
+  background: var(--bg);
   margin: 0 -12px;
-  padding-left: 12px;
-  padding-right: 12px;
+  padding: 6px 12px;
 }
 
 /* Загруженность окна выдачи */
@@ -1399,4 +1413,17 @@ table.data tbody tr:hover { background: rgba(255, 255, 255, 0.025); }
   .dish-hero { margin-left: -14px; margin-right: -14px; border-radius: 0; }
   .dish-img--hero { border-radius: var(--r-lg); }
   .similar > * { flex: 0 0 168px; }
+}
+
+/* Окно выдачи: полоса заполненности живёт внутри строки выбора */
+.option--slot { align-items: flex-start; }
+.option--slot .option__ico { margin-top: 2px; }
+.option--slot .option__right { padding-top: 2px; }
+
+/* Позиция заказа в тикете оператора */
+.ticket__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
 }
