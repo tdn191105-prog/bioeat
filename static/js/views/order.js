@@ -1,7 +1,9 @@
 /* Карточка заказа: QR-код выдачи и трекер статуса. */
 import api from '../api.js';
 import { loadActiveOrders } from '../state.js';
+import { repeatOrder } from './orders.js';
 import { esc, money, toast, go, dateLabel, dateTime, confirmSheet } from '../ui.js';
+import { itemThumb } from '../components.js';
 
 const STEPS = [
   { key: 'paid', title: 'Оплачен', icon: '✓' },
@@ -119,8 +121,11 @@ export default async function orderView(ctx) {
               ${order.items
                 .map(
                   (i) => `<div class="row">
-                            <span class="row__label">${esc(i.icon)} ${esc(i.name)} ×${i.qty}</span>
-                            <span class="bold">${money(i.price * i.qty)}</span>
+                            <span class="row__label hstack" style="gap:10px">
+                              ${itemThumb(i)}
+                              <span>${esc(i.name)} ×${i.qty}</span>
+                            </span>
+                            <span class="bold nowrap">${money(i.price * i.qty)}</span>
                           </div>`,
                 )
                 .join('')}
@@ -130,8 +135,20 @@ export default async function orderView(ctx) {
             </div>
           </section>
 
+          ${
+            ['issued', 'cancelled'].includes(order.status)
+              ? '<button class="btn" data-repeat>↻ Повторить заказ</button>'
+              : ''
+          }
           ${cancellable ? '<button class="btn btn--danger" data-cancel>Отменить заказ</button>' : ''}
           <button class="btn btn--ghost" data-goto="#/orders">Все мои заказы</button>`;
+
+        const repeat = body.querySelector('[data-repeat]');
+        if (repeat) {
+          repeat.onclick = async () => {
+            if (await repeatOrder(order.id, repeat)) go('#/cart');
+          };
+        }
 
         const cancel = body.querySelector('[data-cancel]');
         if (cancel) {

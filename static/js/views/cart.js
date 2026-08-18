@@ -2,7 +2,7 @@
 import api from '../api.js';
 import { state, loadCart, loadMenu, setCart, subscribe } from '../state.js';
 import { esc, money, empty, toast, go, confirmSheet, plural } from '../ui.js';
-import { dishGradient } from '../components.js';
+import { itemThumb } from '../components.js';
 
 export default async function cartView() {
   return {
@@ -35,13 +35,9 @@ export default async function cartView() {
             </div>
             <div class="dish-list">
               ${items
-                .map((item) => {
-                  const dish = state.dishes.find((d) => d.id === item.dish_id) || {
-                    category_id: 0, icon: item.icon,
-                  };
-                  return `
+                .map((item) => `
                   <div class="dish">
-                    <div class="dish__thumb" style="background:${dishGradient(dish)}">${esc(item.icon)}</div>
+                    ${itemThumb(item)}
                     <div class="dish__body">
                       <div class="dish__name">${esc(item.name)}</div>
                       <div class="dish__meta">${money(item.price)} за порцию</div>
@@ -54,8 +50,7 @@ export default async function cartView() {
                         <button data-plus aria-label="Добавить" ${item.qty >= item.stock_qty ? 'disabled' : ''}>+</button>
                       </div>
                     </div>
-                  </div>`;
-                })
+                  </div>`)
                 .join('')}
             </div>
           </section>

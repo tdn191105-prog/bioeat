@@ -88,7 +88,9 @@ export default async function operatorView() {
             ${esc(order.customer_name || '')}${order.customer_group ? ` · ${esc(order.customer_group)}` : ''}
           </div>
           <div class="ticket__items">
-            ${order.items.map((i) => `${esc(i.icon)} ${esc(i.name)} <b>×${i.qty}</b>`).join('<br>')}
+            ${order.items
+              .map((i) => `<span class="ticket__item">${itemThumb(i)}${esc(i.name)} <b>×${i.qty}</b></span>`)
+              .join('')}
           </div>
           ${order.comment ? `<div class="small" style="color:var(--yellow);margin-bottom:8px">💬 ${esc(order.comment)}</div>` : ''}
           <div class="hstack" style="margin-bottom:9px">
@@ -228,7 +230,9 @@ export default async function operatorView() {
             <div class="small muted mt-8">
               ${esc(order.customer_name || '')} · ${esc(order.slot_label)} · ${dateLabel(order.pickup_date)}
             </div>
-            <div class="ticket__items">${order.items.map((i) => `${esc(i.icon)} ${esc(i.name)} ×${i.qty}`).join('<br>')}</div>
+            <div class="ticket__items">${order.items
+              .map((i) => `<span class="ticket__item">${itemThumb(i)}${esc(i.name)} ×${i.qty}</span>`)
+              .join('')}</div>
             <div class="bold">${money(order.total)}</div>
           </div>`;
       };
