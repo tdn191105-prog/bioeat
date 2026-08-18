@@ -5,14 +5,24 @@
 """
 from __future__ import annotations
 
+import json
+import logging
 from datetime import time
+from pathlib import Path
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .db import SessionLocal, create_all
+from .db import SessionLocal, create_all, ensure_columns
+from .dish_details import DISH_DETAILS
 from .models import Category, Dish, PickupSlot, User, UserRole
+from .reference import slugify
 from .security import hash_password
+
+log = logging.getLogger("bioeat")
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+DISH_IMAGES_DIR = BASE_DIR / "static" / "img" / "dishes"
 
 # --------------------------------------------------------------------------- #
 CATEGORIES = [
@@ -166,10 +176,66 @@ USERS = [
 ]
 
 
+def _attribution() -> dict:
+    """Автор, лицензия и первоисточник по каждому файлу из static/img/dishes."""
+    path = DISH_IMAGES_DIR / "attribution.json"
+    if not path.exists():
+        return {}
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        log.warning("Не удалось прочитать attribution.json: %s", exc)
+        return {}
+
+
+async def backfill_dish_details(session: AsyncSession) -> dict:
+    """Дозаполняет состав, аллергены и фото у уже существующих блюд.
+
+    Ничего не перезаписывает: трогаем только пустые поля, поэтому ручные
+    правки администратора в админ-панели остаются на месте.
+    """
+    attribution = _attribution()
+    dishes = (await session.scalars(select(Dish))).all()
+
+    filled_details = 0
+    filled_images = 0
+    for dish in dishes:
+        changed = False
+
+        details = DISH_DETAILS.get(dish.name)
+        if details:
+            if not dish.ingredients and details["ingredients"]:
+                dish.ingredients = list(details["ingredients"])
+                changed = True
+            if not dish.allergens and details["allergens"]:
+                dish.allergens = list(details["allergens"])
+                changed = True
+        if changed:
+            filled_details += 1
+
+        # фотографии лежат в репозитории — привязываем их к свежей базе
+        if not dish.image_url:
+            slug = slugify(dish.name, fallback=f"dish-{dish.id}")
+            if (DISH_IMAGES_DIR / f"{slug}.webp").exists():
+                meta = attribution.get(slug, {})
+                dish.image_url = f"/static/img/dishes/{slug}.webp"
+                dish.image_thumb_url = f"/static/img/dishes/{slug}-thumb.webp"
+                dish.image_placeholder = meta.get("placeholder", "") or dish.image_placeholder
+                dish.image_author = meta.get("author", "")
+                dish.image_license = meta.get("license", "")
+                dish.image_source_url = meta.get("source_url", "")
+                filled_images += 1
+
+    if filled_details or filled_images:
+        await session.commit()
+    return {"details": filled_details, "images": filled_images}
+
+
 async def seed(session: AsyncSession, force: bool = False) -> dict:
     existing = await session.scalar(select(func.count()).select_from(Category))
     if existing and not force:
-        return {"skipped": True, "reason": "База уже наполнена"}
+        # меню уже есть, но новые поля могли появиться вместе с обновлением
+        return {"skipped": True, "reason": "База уже наполнена", **await backfill_dish_details(session)}
 
     cats: dict[str, Category] = {}
     for slug, name, icon, color, sort in CATEGORIES:
@@ -203,6 +269,8 @@ async def seed(session: AsyncSession, force: bool = False) -> dict:
                     carbs=c,
                     icon=icon,
                     tags=tags,
+                    ingredients=list(DISH_DETAILS.get(name, {}).get("ingredients", [])),
+                    allergens=list(DISH_DETAILS.get(name, {}).get("allergens", [])),
                     stock_qty=stock,
                     sort_order=i * 10,
                 )
@@ -240,11 +308,12 @@ async def seed(session: AsyncSession, force: bool = False) -> dict:
         )
 
     await session.commit()
-    return {"skipped": False, "dishes": dishes_created}
+    return {"skipped": False, "dishes": dishes_created, **await backfill_dish_details(session)}
 
 
 async def main() -> None:
     await create_all()
+    await ensure_columns()
     async with SessionLocal() as session:
         result = await seed(session)
     print("Seed:", result)

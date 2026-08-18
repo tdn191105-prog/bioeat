@@ -15,7 +15,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from .config import settings
-from .db import SessionLocal, create_all
+from .db import SessionLocal, create_all, engine, ensure_columns
 from .routers import admin, auth, cart, menu, operator, orders
 from .seed import seed
 
@@ -44,10 +44,19 @@ async def lifespan(app: FastAPI):
     if last_error is not None:
         raise last_error
 
+    # упрощённая замена миграций для MVP — см. комментарий в app/db.py
+    added = await ensure_columns()
+    if added:
+        log.info("Автомиграция добавила колонки: %s", ", ".join(added))
+
     async with SessionLocal() as session:
         result = await seed(session)
     log.info("BioEat запущен. Seed: %s", result)
     yield
+
+    # закрываем пул: рабочий поток aiosqlite не демонический и иначе
+    # не даёт процессу завершиться (заметно в тестах и при Ctrl+C)
+    await engine.dispose()
 
 
 app = FastAPI(

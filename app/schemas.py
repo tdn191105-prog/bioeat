@@ -54,6 +54,14 @@ class DishOut(ORMModel):
     carbs: Decimal
     icon: str
     tags: list[str]
+    image_url: str = ""
+    image_thumb_url: str = ""
+    image_placeholder: str = ""
+    image_author: str = ""
+    image_license: str = ""
+    image_source_url: str = ""
+    ingredients: list[str] = []
+    allergens: list[str] = []
     stock_qty: int
     is_active: bool
     sort_order: int
@@ -71,6 +79,8 @@ class DishIn(BaseModel):
     carbs: Decimal = Field(default=Decimal(0), ge=0)
     icon: str = "🍲"
     tags: list[str] = Field(default_factory=list)
+    ingredients: list[str] = Field(default_factory=list)
+    allergens: list[str] = Field(default_factory=list)
     stock_qty: int = Field(default=50, ge=0, le=100000)
     is_active: bool = True
     sort_order: int = 0
@@ -88,9 +98,20 @@ class DishPatch(BaseModel):
     carbs: Decimal | None = None
     icon: str | None = None
     tags: list[str] | None = None
+    ingredients: list[str] | None = None
+    allergens: list[str] | None = None
     stock_qty: int | None = Field(default=None, ge=0, le=100000)
     is_active: bool | None = None
     sort_order: int | None = None
+
+
+class AllergenOut(BaseModel):
+    code: str
+    name: str
+    short: str
+    icon: str
+    color: str
+    note: str
 
 
 class CategoryOut(ORMModel):
@@ -165,6 +186,9 @@ class CartItemOut(BaseModel):
     dish_id: int
     name: str
     icon: str
+    image_thumb_url: str = ""
+    image_placeholder: str = ""
+    category_id: int | None = None
     price: Decimal
     qty: int
     line_total: Decimal
@@ -195,6 +219,9 @@ class OrderItemOut(ORMModel):
     icon: str
     price: Decimal
     qty: int
+    image_thumb_url: str = ""
+    image_placeholder: str = ""
+    category_id: int | None = None
 
 
 class OrderOut(BaseModel):

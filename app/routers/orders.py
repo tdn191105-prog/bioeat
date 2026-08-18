@@ -13,7 +13,7 @@ from ..db import get_session
 from ..deps import current_user
 from ..models import ACTIVE_STATUSES, Order, OrderStatus, User, UserRole
 from ..schemas import OrderCreateIn, OrderOut, PayIn, PayOut
-from ..services import cancel_order, create_order, order_payload, pay_order
+from ..services import cancel_order, create_order, order_payload, pay_order, repeat_order
 
 router = APIRouter(prefix="/api/orders", tags=["orders"])
 
@@ -97,6 +97,23 @@ async def cancel(
         )
     order = await cancel_order(session, order)
     return order_payload(order)
+
+
+@router.post("/{order_id}/repeat")
+async def repeat(
+    order_id: int,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Повторить заказ: кладёт его состав в корзину.
+
+    Возвращает, что удалось добавить и что пришлось пропустить, — клиент
+    показывает это пользователю, чтобы пропажа позиции не осталась незамеченной.
+    """
+    order = await _load_order(session, order_id, user)
+    if order.user_id != user.id:
+        raise HTTPException(status_code=403, detail="Это не ваш заказ")
+    return await repeat_order(session, user, order)
 
 
 @router.get("/{order_id}/qr.svg")

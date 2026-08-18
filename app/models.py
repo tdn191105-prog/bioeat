@@ -125,9 +125,20 @@ class Dish(Base):
     protein: Mapped[float] = mapped_column(Numeric(6, 1), default=0)
     fat: Mapped[float] = mapped_column(Numeric(6, 1), default=0)
     carbs: Mapped[float] = mapped_column(Numeric(6, 1), default=0)
+    # эмодзи — компактная подпись для админской таблицы; в клиенте показываем фото
     icon: Mapped[str] = mapped_column(String(16), default="🍲")
     # теги диеты: pp, veg, no_lactose, no_gluten, spicy, hit
     tags: Mapped[list] = mapped_column(JSON, default=list)
+    # --- фотография блюда -------------------------------------------------- #
+    image_url: Mapped[str] = mapped_column(String(300), default="")          # 800×600
+    image_thumb_url: Mapped[str] = mapped_column(String(300), default="")    # 400×300
+    image_placeholder: Mapped[str] = mapped_column(String(64), default="")   # HEX-фон
+    image_author: Mapped[str] = mapped_column(String(160), default="")
+    image_license: Mapped[str] = mapped_column(String(80), default="")
+    image_source_url: Mapped[str] = mapped_column(String(400), default="")
+    # --- состав и аллергены ------------------------------------------------ #
+    ingredients: Mapped[list] = mapped_column(JSON, default=list)  # список строк
+    allergens: Mapped[list] = mapped_column(JSON, default=list)    # коды из ALLERGENS
     stock_qty: Mapped[int] = mapped_column(Integer, default=50)   # порций на день
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
@@ -236,9 +247,12 @@ class OrderItem(Base):
     dish_id: Mapped[int | None] = mapped_column(
         ForeignKey("dishes.id", ondelete="SET NULL"), nullable=True
     )
-    # снимки на момент заказа — цена в истории не должна «плыть»
+    # снимки на момент заказа — цена и вид блюда в истории не должны «плыть»
     name: Mapped[str] = mapped_column(String(160))
     icon: Mapped[str] = mapped_column(String(16), default="🍲")
+    image_thumb_url: Mapped[str] = mapped_column(String(300), default="")
+    image_placeholder: Mapped[str] = mapped_column(String(64), default="")
+    category_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     price: Mapped[float] = mapped_column(Numeric(10, 2))
     qty: Mapped[int] = mapped_column(Integer, default=1)
 

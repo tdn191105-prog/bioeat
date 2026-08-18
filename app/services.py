@@ -97,6 +97,9 @@ async def cart_payload(session: AsyncSession, user: User) -> dict:
                 "dish_id": dish.id,
                 "name": dish.name,
                 "icon": dish.icon,
+                "image_thumb_url": dish.image_thumb_url or "",
+                "image_placeholder": dish.image_placeholder or "",
+                "category_id": dish.category_id,
                 "price": price,
                 "qty": item.qty,
                 "line_total": line,
@@ -314,7 +317,16 @@ async def create_order(
         price = money(dish.price)
         subtotal += money(price * item.qty)
         order_items.append(
-            OrderItem(dish_id=dish.id, name=dish.name, icon=dish.icon, price=price, qty=item.qty)
+            OrderItem(
+                dish_id=dish.id,
+                name=dish.name,
+                icon=dish.icon,
+                image_thumb_url=dish.image_thumb_url or "",
+                image_placeholder=dish.image_placeholder or "",
+                category_id=dish.category_id,
+                price=price,
+                qty=item.qty,
+            )
         )
 
     bonus_used = Decimal("0.00")
@@ -435,3 +447,73 @@ async def pay_order(
     if pretty.endswith(".00"):  # целые суммы показываем без копеек
         pretty = pretty[:-3]
     return True, f"Оплачено {label.get(method, '')} — {pretty} ₽", provider_ref
+
+
+# --------------------------------------------------------------------------- #
+#  Популярность и повтор заказа
+# --------------------------------------------------------------------------- #
+async def popular_dish_ids(session: AsyncSession, days: int = 7, limit: int = 6) -> list[int]:
+    """id блюд, отсортированные по проданным порциям за последние `days` дней.
+
+    Считаем только оплаченные и выданные заказы — отменённые и неоплаченные
+    в статистику продаж не попадают.
+    """
+    since = campus_today() - timedelta(days=days)
+    counted = (
+        OrderStatus.paid,
+        OrderStatus.accepted,
+        OrderStatus.cooking,
+        OrderStatus.ready,
+        OrderStatus.issued,
+    )
+    rows = (
+        await session.execute(
+            select(OrderItem.dish_id, func.sum(OrderItem.qty).label("sold"))
+            .join(Order, Order.id == OrderItem.order_id)
+            .where(
+                OrderItem.dish_id.is_not(None),
+                Order.pickup_date >= since,
+                Order.status.in_(counted),
+            )
+            .group_by(OrderItem.dish_id)
+            .order_by(func.sum(OrderItem.qty).desc())
+            .limit(limit)
+        )
+    ).all()
+    return [int(r[0]) for r in rows if r[0] is not None]
+
+
+async def repeat_order(session: AsyncSession, user: User, order: Order) -> dict:
+    """Кладёт состав прошлого заказа в корзину.
+
+    Недоступные позиции пропускаем, доступные добавляем в том количестве,
+    которое реально осталось на кухне, и честно рассказываем, что не поместилось.
+    """
+    await session.refresh(order, ["items"])
+
+    added: list[str] = []
+    skipped: list[dict] = []
+    for item in sorted(order.items, key=lambda i: i.id):
+        if item.dish_id is None:
+            skipped.append({"name": item.name, "reason": "снято с меню"})
+            continue
+        dish = await session.get(Dish, item.dish_id)
+        if dish is None or not dish.is_active:
+            skipped.append({"name": item.name, "reason": "снято с меню"})
+            continue
+        if dish.stock_qty <= 0:
+            skipped.append({"name": dish.name, "reason": "сегодня закончилось"})
+            continue
+        qty = min(item.qty, dish.stock_qty)
+        await set_cart_item(session, user, dish.id, qty)
+        added.append(dish.name)
+        if qty < item.qty:
+            skipped.append(
+                {"name": dish.name, "reason": f"добавили {qty} из {item.qty} — больше нет"}
+            )
+
+    return {
+        "added": added,
+        "skipped": skipped,
+        "cart": await cart_payload(session, user),
+    }
