@@ -1,0 +1,35 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: bioeat-db
+    environment:
+      POSTGRES_USER: bioeat
+      POSTGRES_PASSWORD: bioeat
+      POSTGRES_DB: bioeat
+    volumes:
+      - bioeat-pgdata:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bioeat -d bioeat"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  app:
+    build: .
+    container_name: bioeat-app
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://bioeat:bioeat@db:5432/bioeat
+      SECRET_KEY: ${SECRET_KEY:-dev-secret-change-me-in-production}
+      TZ_OFFSET_HOURS: 3
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+volumes:
+  bioeat-pgdata:

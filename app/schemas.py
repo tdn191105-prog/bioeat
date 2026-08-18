@@ -1,0 +1,255 @@
+"""Pydantic-схемы запросов и ответов."""
+from __future__ import annotations
+
+from datetime import date, datetime
+from decimal import Decimal
+
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
+
+from .models import OrderStatus, PaymentMethod, UserRole
+
+
+class ORMModel(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ------------------------------- Auth -------------------------------------- #
+class LoginIn(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=4, max_length=128)
+
+
+class RegisterIn(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=4, max_length=128)
+    full_name: str = Field(min_length=2, max_length=160)
+    group_name: str | None = Field(default=None, max_length=80)
+
+
+class UserOut(ORMModel):
+    id: int
+    email: str
+    full_name: str
+    role: UserRole
+    group_name: str | None = None
+    bonus_balance: Decimal
+
+
+class AuthOut(BaseModel):
+    token: str
+    user: UserOut
+
+
+# ------------------------------- Меню --------------------------------------- #
+class DishOut(ORMModel):
+    id: int
+    category_id: int
+    name: str
+    description: str
+    price: Decimal
+    weight_g: int
+    kcal: int
+    protein: Decimal
+    fat: Decimal
+    carbs: Decimal
+    icon: str
+    tags: list[str]
+    stock_qty: int
+    is_active: bool
+    sort_order: int
+
+
+class DishIn(BaseModel):
+    category_id: int
+    name: str = Field(min_length=1, max_length=160)
+    description: str = ""
+    price: Decimal = Field(ge=0, le=100000)
+    weight_g: int = Field(default=0, ge=0, le=5000)
+    kcal: int = Field(default=0, ge=0, le=10000)
+    protein: Decimal = Field(default=Decimal(0), ge=0)
+    fat: Decimal = Field(default=Decimal(0), ge=0)
+    carbs: Decimal = Field(default=Decimal(0), ge=0)
+    icon: str = "🍲"
+    tags: list[str] = Field(default_factory=list)
+    stock_qty: int = Field(default=50, ge=0, le=100000)
+    is_active: bool = True
+    sort_order: int = 0
+
+
+class DishPatch(BaseModel):
+    category_id: int | None = None
+    name: str | None = Field(default=None, min_length=1, max_length=160)
+    description: str | None = None
+    price: Decimal | None = Field(default=None, ge=0, le=100000)
+    weight_g: int | None = Field(default=None, ge=0, le=5000)
+    kcal: int | None = Field(default=None, ge=0, le=10000)
+    protein: Decimal | None = None
+    fat: Decimal | None = None
+    carbs: Decimal | None = None
+    icon: str | None = None
+    tags: list[str] | None = None
+    stock_qty: int | None = Field(default=None, ge=0, le=100000)
+    is_active: bool | None = None
+    sort_order: int | None = None
+
+
+class CategoryOut(ORMModel):
+    id: int
+    name: str
+    slug: str
+    icon: str
+    color: str
+    sort_order: int
+    is_active: bool
+
+
+class CategoryIn(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+    slug: str | None = Field(default=None, max_length=80)
+    icon: str = "🍽"
+    color: str = "#4a7dff"
+    sort_order: int = 0
+    is_active: bool = True
+
+
+class CategoryPatch(BaseModel):
+    name: str | None = None
+    icon: str | None = None
+    color: str | None = None
+    sort_order: int | None = None
+    is_active: bool | None = None
+
+
+# ------------------------------- Слоты -------------------------------------- #
+class SlotOut(BaseModel):
+    id: int
+    label: str
+    time_range: str
+    starts_at: str
+    ends_at: str
+    point: str
+    capacity: int
+    taken: int
+    left: int
+    is_available: bool
+    is_active: bool
+
+
+class SlotIn(BaseModel):
+    label: str = Field(min_length=1, max_length=80)
+    starts_at: str  # "10:00"
+    ends_at: str    # "10:25"
+    capacity: int = Field(default=60, ge=1, le=100000)
+    point: str = "Окно «Экспресс-выдача»"
+    is_active: bool = True
+    sort_order: int = 0
+
+
+class SlotPatch(BaseModel):
+    label: str | None = None
+    starts_at: str | None = None
+    ends_at: str | None = None
+    capacity: int | None = Field(default=None, ge=1, le=100000)
+    point: str | None = None
+    is_active: bool | None = None
+    sort_order: int | None = None
+
+
+# ------------------------------- Корзина ------------------------------------ #
+class CartItemIn(BaseModel):
+    dish_id: int
+    qty: int = Field(default=1, ge=0, le=50)
+
+
+class CartItemOut(BaseModel):
+    dish_id: int
+    name: str
+    icon: str
+    price: Decimal
+    qty: int
+    line_total: Decimal
+    stock_qty: int
+    is_active: bool
+
+
+class CartOut(BaseModel):
+    items: list[CartItemOut]
+    count: int
+    subtotal: Decimal
+    bonus_available: Decimal
+    max_bonus_applicable: Decimal
+
+
+# ------------------------------- Заказы ------------------------------------- #
+class OrderCreateIn(BaseModel):
+    slot_id: int
+    comment: str = Field(default="", max_length=300)
+    use_bonus: bool = False
+    pickup_date: date | None = None
+
+
+class OrderItemOut(ORMModel):
+    id: int
+    dish_id: int | None
+    name: str
+    icon: str
+    price: Decimal
+    qty: int
+
+
+class OrderOut(BaseModel):
+    id: int
+    number: str
+    status: OrderStatus
+    status_label: str
+    slot_label: str
+    pickup_point: str
+    pickup_date: date
+    subtotal: Decimal
+    bonus_used: Decimal
+    total: Decimal
+    bonus_earned: Decimal
+    comment: str
+    pickup_code: str
+    created_at: datetime
+    paid_at: datetime | None = None
+    ready_at: datetime | None = None
+    issued_at: datetime | None = None
+    items: list[OrderItemOut]
+    customer_name: str | None = None
+    customer_group: str | None = None
+
+
+class PayIn(BaseModel):
+    method: PaymentMethod = PaymentMethod.sbp
+    # в демо-режиме можно смоделировать отказ банка
+    simulate_failure: bool = False
+
+
+class PayOut(BaseModel):
+    ok: bool
+    message: str
+    order: OrderOut | None = None
+    provider_ref: str | None = None
+
+
+# ------------------------------- Оператор ----------------------------------- #
+class StatusPatch(BaseModel):
+    status: OrderStatus
+
+
+class IssueIn(BaseModel):
+    code: str
+
+
+# ------------------------------- Статистика --------------------------------- #
+class StatsOut(BaseModel):
+    orders_today: int
+    revenue_today: Decimal
+    active_orders: int
+    issued_today: int
+    avg_check: Decimal
+    top_dishes: list[dict]
+    by_slot: list[dict]
+    users_total: int
+    dishes_active: int
