@@ -249,6 +249,9 @@ class Order(Base):
     user: Mapped[User] = relationship(back_populates="orders", lazy="joined")
     slot: Mapped[PickupSlot | None] = relationship(lazy="joined")
     locker: Mapped[Locker | None] = relationship(lazy="joined")
+    review: Mapped[Review | None] = relationship(
+        back_populates="order", uselist=False, lazy="selectin", viewonly=True
+    )
     items: Mapped[list[OrderItem]] = relationship(
         back_populates="order", cascade="all, delete-orphan", lazy="selectin"
     )
@@ -411,3 +414,37 @@ class LockerEvent(Base):
     order_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     detail: Mapped[str] = mapped_column(String(200), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+
+
+# --------------------------------------------------------------------------- #
+#  Отзывы
+# --------------------------------------------------------------------------- #
+class ReviewStatus(str, enum.Enum):
+    published = "published"
+    hidden = "hidden"        # скрыт модератором столовой
+
+
+class Review(Base):
+    __tablename__ = "reviews"
+    # один отзыв на заказ; общих отзывов о столовой (order_id NULL) может быть много
+    __table_args__ = (UniqueConstraint("order_id", name="uq_review_order"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    order_id: Mapped[int | None] = mapped_column(
+        ForeignKey("orders.id", ondelete="SET NULL"), nullable=True
+    )
+    rating: Mapped[int] = mapped_column(Integer)
+    tags: Mapped[list] = mapped_column(JSON, default=list)
+    text: Mapped[str] = mapped_column(Text, default="")
+    is_anonymous: Mapped[bool] = mapped_column(Boolean, default=False)
+    status: Mapped[ReviewStatus] = mapped_column(
+        Enum(ReviewStatus, native_enum=False, length=20), default=ReviewStatus.published, index=True
+    )
+    staff_reply: Mapped[str] = mapped_column(Text, default="")
+    staff_reply_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
+
+    user: Mapped[User] = relationship(lazy="joined")
+    order: Mapped[Order | None] = relationship(back_populates="review", lazy="joined")

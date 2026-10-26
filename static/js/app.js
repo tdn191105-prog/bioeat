@@ -15,6 +15,7 @@ const ROUTES = {
   '/login': () => import('./views/auth.js'),
   '/operator': () => import('./views/operator.js'),
   '/admin': () => import('./views/admin.js'),
+  '/reviews': () => import('./views/reviews.js'),
 };
 
 const NAV = [
@@ -87,6 +88,9 @@ function renderNav(path) {
   const staffLinks = [];
   if (isStaff()) {
     staffLinks.push({ href: '#/operator', icon: '👨‍🍳', label: 'Кабинет столовой', match: (p) => p === '/operator' });
+  }
+  if (isStaff()) {
+    staffLinks.push({ href: '#/reviews', icon: '💬', label: 'Отзывы', match: (p) => p === '/reviews' });
   }
   if (isAdmin()) {
     staffLinks.push({ href: '#/admin', icon: '⚙️', label: 'Админ-панель', match: (p) => p === '/admin' });

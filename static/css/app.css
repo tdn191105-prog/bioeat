@@ -1527,3 +1527,38 @@ table.data tbody tr:hover { background: rgba(255, 255, 255, 0.025); }
 /* PIN постамата под одноразовым QR */
 .locker-pin { font-size: 15px; color: var(--text-2); letter-spacing: .5px; }
 .locker-pin b { font-size: 26px; color: var(--text); letter-spacing: 3px; font-variant-numeric: tabular-nums; }
+
+/* --------------------------------------------------------------------------
+ *  Отзывы
+ * -------------------------------------------------------------------------- */
+.stars { color: var(--surface-3); letter-spacing: 1px; font-size: 17px; white-space: nowrap; }
+.stars .is-on { color: var(--yellow); }
+.stars--lg { font-size: 22px; }
+.star-input { display: flex; justify-content: center; gap: 6px; }
+.star-input button {
+  width: 48px; height: 48px;
+  font-size: 34px;
+  line-height: 1;
+  color: var(--surface-3);
+  border-radius: 12px;
+  transition: transform .12s, color .12s;
+}
+.star-input button.is-on { color: var(--yellow); }
+.star-input button:active { transform: scale(.88); }
+.chips--wrap { flex-wrap: wrap; overflow: visible; }
+.review { padding: 14px 0; border-bottom: 1px solid var(--line); }
+.review:last-child { border-bottom: none; }
+.review__text { margin-top: 8px; line-height: 1.45; white-space: pre-line; }
+.review__reply {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--accent-soft);
+  font-size: 13.5px;
+}
+.review-dist { display: grid; grid-template-columns: 26px 1fr 34px; gap: 6px 10px; align-items: center; font-size: 13px; }
+.review-dist__bar { height: 8px; border-radius: 8px; background: var(--surface-3); overflow: hidden; }
+.review-dist__bar span { display: block; height: 100%; background: var(--yellow); border-radius: 8px; }
+.rate-row { display: flex; align-items: center; gap: 4px; margin-top: 10px; }
+.rate-row button { font-size: 26px; color: var(--surface-3); width: 44px; height: 44px; }
+.rate-row button:hover { color: var(--yellow); }

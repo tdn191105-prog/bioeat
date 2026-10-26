@@ -27,12 +27,14 @@ from .models import (
     PaymentMethod,
     PaymentStatus,
     PickupSlot,
+    Review,
     User,
     UserRole,
+    utcnow,
 )
 from .security import hash_password, make_pickup_code
 from .seed import seed
-from .services import campus_now, campus_today, generate_order_number, money
+from .services import campus_today, generate_order_number, money
 
 STUDENTS = [
     ("Тапильский Роман", "roman@rosbiotech.ru", "23о-380302-УБ/1"),
@@ -46,6 +48,20 @@ STUDENTS = [
 ]
 
 COMMENTS = ["", "", "", "без лука", "приборы не нужны", "два соуса, пожалуйста", "без хлеба"]
+
+# (оценка, теги, текст) — правдоподобные отзывы для ленты столовой
+REVIEWS = [
+    (5, ["tasty", "fast"], "Забрал за минуту на перемене, всё горячее. Спасибо!"),
+    (5, ["tasty", "hot"], "Борщ как дома."),
+    (5, ["fast"], ""),
+    (4, ["tasty"], "Вкусно, но хотелось бы побольше салата."),
+    (4, ["fast", "polite"], ""),
+    (5, ["big_portion", "tasty"], "Сытно и недорого."),
+    (3, ["small_portion"], "Порция гарнира маленькая для такой цены."),
+    (2, ["cold", "long_wait"], "Пришлось подождать у окна, котлета остыла."),
+    (4, [], "Удобно, что не надо стоять в очереди."),
+    (1, ["wrong_order"], "Положили не тот напиток."),
+]
 
 
 async def ensure_students(session: AsyncSession) -> list[User]:
@@ -104,7 +120,8 @@ async def make_order(
 
     total = money(subtotal - bonus_used)
     number = await generate_order_number(session)
-    created = campus_now() - timedelta(minutes=random.randint(15, 240))
+    # метки времени в базе — UTC (см. models.utcnow), а не время кампуса
+    created = utcnow() - timedelta(minutes=random.randint(15, 240))
 
     order = Order(
         number=number,
@@ -170,15 +187,39 @@ async def generate(session: AsyncSession) -> dict:
     ]
 
     created = 0
+    issued: list[Order] = []
     for on_date, status, count in plan:
         for _ in range(count):
-            await make_order(
+            order = await make_order(
                 session, random.choice(users), dishes, random.choice(slots), on_date, status
             )
+            if status == OrderStatus.issued:
+                issued.append(order)
             created += 1
+    await session.flush()
+
+    # отзывы примерно на две трети выданных заказов
+    reviews = 0
+    for order in issued:
+        if random.random() > 0.65:
+            continue
+        rating, tags, text = random.choice(REVIEWS)
+        session.add(
+            Review(
+                user_id=order.user_id,
+                order_id=order.id,
+                rating=rating,
+                tags=tags,
+                text=text,
+                is_anonymous=random.random() < 0.3,
+                created_at=(order.issued_at or order.created_at) + timedelta(minutes=random.randint(5, 90)),
+                staff_reply="Спасибо, что написали! Разберёмся и исправим." if rating <= 2 else "",
+            )
+        )
+        reviews += 1
 
     await session.commit()
-    return {"orders": created, "students": len(users)}
+    return {"orders": created, "reviews": reviews, "students": len(users)}
 
 
 async def reset(session: AsyncSession) -> int:
@@ -189,6 +230,7 @@ async def reset(session: AsyncSession) -> int:
         return 0
     orders = (await session.scalars(select(Order).where(Order.user_id.in_(ids)))).all()
     count = len(orders)
+    await session.execute(delete(Review).where(Review.user_id.in_(ids)))
     await session.execute(delete(Order).where(Order.user_id.in_(ids)))
     await session.commit()
     return count

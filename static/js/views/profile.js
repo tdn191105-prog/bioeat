@@ -1,6 +1,7 @@
 /* Профиль пользователя. */
 import { state, logout, isStaff, isAdmin } from '../state.js';
-import { esc, money, go, toast, confirmSheet } from '../ui.js';
+import { esc, money, go, toast, confirmSheet, openSheet, closeSheet } from '../ui.js';
+import { mountReviewForm } from '../components.js';
 
 const ROLE_LABELS = { student: 'Обучающийся', operator: 'Оператор столовой', admin: 'Администратор' };
 
@@ -47,6 +48,12 @@ export default async function profileView() {
               <span class="option__sub">История и активные предзаказы</span></span>
               <span class="option__right">→</span>
             </button>
+            <button class="option" data-feedback>
+              <span class="option__ico">⭐</span>
+              <span class="option__body"><span class="option__title">Отзыв о столовой</span>
+              <span class="option__sub">Что нравится и что улучшить — читает столовая</span></span>
+              <span class="option__right">→</span>
+            </button>
             <button class="option" data-goto="#/menu">
               <span class="option__ico">🍲</span>
               <span class="option__body"><span class="option__title">Меню столовой</span>
@@ -59,6 +66,16 @@ export default async function profileView() {
                      <span class="option__ico">👨‍🍳</span>
                      <span class="option__body"><span class="option__title">Кабинет столовой</span>
                      <span class="option__sub">Заказы по переменам, сборка и выдача</span></span>
+                     <span class="option__right">→</span>
+                   </button>`
+                : ''
+            }
+            ${
+              isStaff()
+                ? `<button class="option" data-goto="#/reviews">
+                     <span class="option__ico">💬</span>
+                     <span class="option__body"><span class="option__title">Отзывы</span>
+                     <span class="option__sub">Оценки, ответы и модерация</span></span>
                      <span class="option__right">→</span>
                    </button>`
                 : ''
@@ -92,6 +109,17 @@ export default async function profileView() {
       root.querySelectorAll('[data-goto]').forEach((el) => {
         el.onclick = () => go(el.dataset.goto);
       });
+      root.querySelector('[data-feedback]').onclick = () => {
+        openSheet(
+          `<div class="stack">
+             <h2 class="section__title" style="font-size:21px">Отзыв о столовой</h2>
+             <div data-form></div>
+           </div>`,
+          (sheet) => mountReviewForm(sheet.querySelector('[data-form]'), {
+            onSaved: () => closeSheet(),
+          }),
+        );
+      };
       root.querySelector('#logout').onclick = async () => {
         const ok = await confirmSheet({
           title: 'Выйти из аккаунта?',

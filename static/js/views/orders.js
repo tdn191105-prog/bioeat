@@ -2,7 +2,7 @@
 import api from '../api.js';
 import { loadCart } from '../state.js';
 import { esc, money, empty, go, dateLabel, skeletonList, toast } from '../ui.js';
-import { statusPill, orderSummary } from '../components.js';
+import { statusPill, orderSummary, starsHtml } from '../components.js';
 
 /** Кладёт состав прошлого заказа в корзину и честно рассказывает, что пропущено. */
 export async function repeatOrder(orderId, button) {
@@ -79,6 +79,16 @@ export default async function ordersView() {
             </div>
           </div>
           ${
+            order.status === 'issued'
+              ? order.review
+                ? `<div class="small muted mt-8">Ваша оценка: ${starsHtml(order.review.rating)}</div>`
+                : `<div class="small bold mt-8">Как вам заказ?</div>
+                   <div class="rate-row" aria-label="Оценить заказ">${[1, 2, 3, 4, 5]
+                     .map((n) => `<button type="button" data-rate="${n}" data-order="${order.id}" aria-label="${n} из 5">★</button>`)
+                     .join('')}</div>`
+              : ''
+          }
+          ${
             ['issued', 'cancelled'].includes(order.status)
               ? `<button class="btn btn--ghost btn--sm mt-8" data-repeat="${order.id}">↻ Повторить заказ</button>`
               : ''
@@ -101,6 +111,12 @@ export default async function ordersView() {
       }
 
       host.addEventListener('click', async (e) => {
+        const rate = e.target.closest('[data-rate]');
+        if (rate) {
+          e.stopPropagation();
+          go(`#/order/${rate.dataset.order}?rate=${rate.dataset.rate}`);
+          return;
+        }
         const repeat = e.target.closest('[data-repeat]');
         if (repeat) {
           e.stopPropagation();

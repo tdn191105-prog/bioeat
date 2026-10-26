@@ -174,3 +174,101 @@ export const statusPill = (order) =>
 /** Короткое перечисление состава заказа. */
 export const orderSummary = (order) =>
   order.items.map((i) => `${esc(i.name)}${i.qty > 1 ? ` ×${i.qty}` : ''}`).join(' · ');
+
+/* ------------------------------- Отзывы ---------------------------------- */
+let reviewTagsCache = null;
+export async function reviewTags() {
+  if (!reviewTagsCache) reviewTagsCache = await api.get('/api/reviews/tags');
+  return reviewTagsCache;
+}
+
+export const starsHtml = (rating, cls = '') =>
+  `<span class="stars ${cls}" aria-label="Оценка ${rating} из 5">${[1, 2, 3, 4, 5]
+    .map((n) => `<span class="${n <= rating ? 'is-on' : ''}">★</span>`)
+    .join('')}</span>`;
+
+/** Готовый отзыв: звёзды, теги, текст и ответ столовой. */
+export function reviewCard(review, { actions = '' } = {}) {
+  return `
+    <div class="review">
+      <div class="hstack">
+        ${starsHtml(review.rating)}
+        <div class="spacer"></div>
+        <span class="small muted">${esc(review.author)}${review.order_number ? ` · ${esc(review.order_number)}` : ''}</span>
+      </div>
+      ${review.tag_labels.length ? `<div class="tag-row" style="margin-top:8px">${review.tag_labels.map((t) => `<span class="tag">${esc(t)}</span>`).join('')}</div>` : ''}
+      ${review.text ? `<div class="review__text">${esc(review.text)}</div>` : ''}
+      ${review.staff_reply ? `<div class="review__reply"><b>Ответ столовой:</b> ${esc(review.staff_reply)}</div>` : ''}
+      ${actions}
+    </div>`;
+}
+
+/**
+ * Форма «Как вам заказ?»: звёзды, теги, текст, анонимность.
+ * existing — отзыв для редактирования (24 часа после публикации).
+ */
+export async function mountReviewForm(host, { orderId = null, existing = null, rating = 0, onSaved } = {}) {
+  const tags = await reviewTags();
+  const form = {
+    rating: existing ? existing.rating : rating,
+    tags: new Set(existing ? existing.tags : []),
+    text: existing ? existing.text : '',
+    anon: existing ? existing.is_anonymous : false,
+  };
+  const hint = ['', 'Очень плохо', 'Плохо', 'Нормально', 'Хорошо', 'Отлично!'];
+
+  const draw = () => {
+    // хорошие теги — к высокой оценке, жалобы — к низкой; выбранные видны всегда
+    const visible = tags.filter((t) => !form.rating || form.tags.has(t.code)
+      || (form.rating >= 4 ? t.positive : form.rating <= 2 ? !t.positive : true));
+    host.innerHTML = `
+      <div class="stack">
+        <div class="star-input" role="radiogroup" aria-label="Оценка">
+          ${[1, 2, 3, 4, 5].map((n) => `<button type="button" role="radio" aria-checked="${form.rating === n}"
+               aria-label="${n} из 5" class="${n <= form.rating ? 'is-on' : ''}" data-star="${n}">★</button>`).join('')}
+        </div>
+        <div class="small muted center">${esc(hint[form.rating] || 'Нажмите на звезду')}</div>
+        ${form.rating ? `
+          <div class="chips chips--wrap">
+            ${visible.map((t) => `<button type="button" class="chip ${form.tags.has(t.code) ? 'is-active' : ''}" data-tag="${t.code}">${esc(t.label)}</button>`).join('')}
+          </div>
+          <textarea class="input" maxlength="1000" data-text placeholder="Что понравилось или что исправить? Необязательно">${esc(form.text)}</textarea>
+          <button type="button" class="option ${form.anon ? 'is-active' : ''}" data-anon>
+            <span class="option__ico">🙈</span>
+            <span class="option__body"><span class="option__title">Анонимно</span>
+            <span class="option__sub">Столовая не увидит ваше имя и группу</span></span>
+            <span class="switch ${form.anon ? 'is-on' : ''}"></span>
+          </button>
+          <button type="button" class="btn" data-send>${existing ? 'Сохранить отзыв' : 'Отправить отзыв'}</button>` : ''}
+      </div>`;
+    const text = host.querySelector('[data-text]');
+    if (text) text.oninput = () => { form.text = text.value; };
+  };
+  draw();
+
+  host.onclick = async (event) => {
+    const star = event.target.closest('[data-star]');
+    if (star) { form.rating = Number(star.dataset.star); vibrate(); draw(); return; }
+    const tag = event.target.closest('[data-tag]');
+    if (tag) {
+      if (form.tags.has(tag.dataset.tag)) form.tags.delete(tag.dataset.tag); else form.tags.add(tag.dataset.tag);
+      draw();
+      return;
+    }
+    if (event.target.closest('[data-anon]')) { form.anon = !form.anon; draw(); return; }
+    const send = event.target.closest('[data-send]');
+    if (!send) return;
+    send.disabled = true;
+    const body = { rating: form.rating, tags: [...form.tags], text: form.text.trim(), is_anonymous: form.anon };
+    try {
+      const saved = existing
+        ? await api.patch(`/api/reviews/${existing.id}`, body)
+        : await api.post('/api/reviews', { ...body, order_id: orderId });
+      toast(existing ? 'Отзыв обновлён' : 'Спасибо за отзыв!', 'ok');
+      if (onSaved) onSaved(saved);
+    } catch (err) {
+      toast(err.message, 'err');
+      send.disabled = false;
+    }
+  };
+}

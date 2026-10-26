@@ -47,6 +47,7 @@ from ..schemas import (
 )
 from ..security import hash_password
 from ..services import campus_today, money, slots_payload
+from .reviews import average_rating
 
 router = APIRouter(prefix="/api/admin", tags=["admin"], dependencies=[Depends(admin_required)])
 
@@ -467,6 +468,7 @@ async def stats(
         ) or 0
     )
     avg_check = money(revenue_today / paid_count) if paid_count else Decimal("0.00")
+    rating_avg, reviews_count = await average_rating(session)
 
     top_rows = (
         await session.execute(
@@ -506,6 +508,8 @@ async def stats(
         "by_slot": [
             {"slot": r[0], "orders": int(r[1] or 0), "sum": float(r[2] or 0)} for r in slot_rows
         ],
+        "rating_avg": rating_avg,
+        "reviews_count": reviews_count,
         "users_total": int(await session.scalar(select(func.count()).select_from(User)) or 0),
         "dishes_active": int(
             await session.scalar(

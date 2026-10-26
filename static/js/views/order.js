@@ -3,7 +3,7 @@ import api from '../api.js';
 import { loadActiveOrders } from '../state.js';
 import { repeatOrder } from './orders.js';
 import { esc, money, toast, go, dateLabel, dateTime, confirmSheet } from '../ui.js';
-import { itemThumb } from '../components.js';
+import { itemThumb, mountReviewForm, reviewCard } from '../components.js';
 
 /* Шаги «принят» и «комплектуется» у кухни необязательны, поэтому для студента
    они сведены в один: «Кухня собирает». Для постамата третий шаг — ячейка. */
@@ -175,6 +175,14 @@ export default async function orderView(ctx) {
           </section>
 
           ${
+            order.status === 'issued'
+              ? `<section class="section" id="review-box">
+                   <div class="section__head"><h2 class="section__title">Как вам заказ?</h2></div>
+                   <div data-review-body><div class="skeleton" style="height:60px"></div></div>
+                 </section>`
+              : ''
+          }
+          ${
             ['issued', 'cancelled'].includes(order.status)
               ? '<button class="btn" data-repeat>↻ Повторить заказ</button>'
               : ''
@@ -215,6 +223,34 @@ export default async function orderView(ctx) {
           el.onclick = () => go(el.dataset.goto);
         });
         syncLockerCode();
+        mountReview();
+      };
+
+      /* Отзыв после выдачи: форма или уже оставленный отзыв (править можно 24 часа). */
+      const presetRating = Number(ctx.query?.get('rate')) || 0;
+      const mountReview = async (forceEdit = false) => {
+        const host = body.querySelector('[data-review-body]');
+        if (!host) return;
+        let mine = null;
+        try {
+          [mine] = await api.get(`/api/reviews/mine?order_id=${order.id}`);
+        } catch { /* покажем форму — сервер всё равно не даст оставить второй отзыв */ }
+        if (mine && !forceEdit) {
+          host.innerHTML = reviewCard(mine, {
+            actions: mine.can_edit
+              ? '<button class="btn btn--ghost btn--sm mt-8" data-edit-review>Изменить отзыв</button><div class="small muted mt-8">Изменить можно в течение 24 часов</div>'
+              : '',
+          });
+          const editBtn = host.querySelector('[data-edit-review]');
+          if (editBtn) editBtn.onclick = () => mountReview(true);
+          return;
+        }
+        await mountReviewForm(host, {
+          orderId: order.id,
+          existing: mine,
+          rating: presetRating,
+          onSaved: () => mountReview(),
+        });
       };
 
       /* Одноразовый QR постамата: живёт 120 с, экран берёт новый каждые ~60 с,

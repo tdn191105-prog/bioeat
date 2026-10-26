@@ -675,6 +675,9 @@ export default async function adminView() {
                 <div class="kpi"><div class="kpi__label">Выручка</div><div class="kpi__value">${money(s.revenue_today)}</div></div>
                 <div class="kpi"><div class="kpi__label">Средний чек</div><div class="kpi__value">${money(s.avg_check)}</div></div>
                 <div class="kpi"><div class="kpi__label">Выдано</div><div class="kpi__value">${s.issued_today}</div></div>
+                <div class="kpi"><div class="kpi__label">Оценка за 30 дней</div><div class="kpi__value">${
+                  s.rating_avg != null ? `${String(s.rating_avg.toFixed(1)).replace('.', ',')} ★` : '—'
+                }</div><div class="small muted">${s.reviews_count} отз. · <a href="#/reviews" style="color:var(--accent)">все отзывы</a></div></div>
               </div>
               <section class="section">
                 <div class="section__head"><h2 class="section__title" style="font-size:19px">Топ блюд</h2></div>

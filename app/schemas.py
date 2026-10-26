@@ -264,6 +264,7 @@ class OrderOut(BaseModel):
     cell_number: int | None = None
     placed_at: datetime | None = None
     picked_up_at: datetime | None = None
+    review: dict | None = None               # {id, rating}, если студент уже оценил заказ
 
 
 class PayIn(BaseModel):
@@ -339,3 +340,45 @@ class StatsOut(BaseModel):
     by_slot: list[dict]
     users_total: int
     dishes_active: int
+    rating_avg: float | None = None      # средняя оценка за 30 дней
+    reviews_count: int = 0
+
+
+# ------------------------------- Отзывы ------------------------------------- #
+class ReviewIn(BaseModel):
+    order_id: int | None = None     # None — общий отзыв о столовой
+    rating: int = Field(ge=1, le=5)
+    tags: list[str] = Field(default_factory=list, max_length=10)
+    text: str = Field(default="", max_length=1000)
+    is_anonymous: bool = False
+
+
+class ReviewPatch(BaseModel):
+    rating: int | None = Field(default=None, ge=1, le=5)
+    tags: list[str] | None = Field(default=None, max_length=10)
+    text: str | None = Field(default=None, max_length=1000)
+    is_anonymous: bool | None = None
+
+
+class ReviewReplyIn(BaseModel):
+    text: str = Field(min_length=1, max_length=1000)
+
+
+class ReviewOut(BaseModel):
+    id: int
+    order_id: int | None = None
+    order_number: str | None = None
+    rating: int
+    tags: list[str]
+    tag_labels: list[str]
+    text: str
+    is_anonymous: bool
+    author: str                      # «Аноним» для анонимных
+    author_group: str | None = None
+    status: str
+    staff_reply: str = ""
+    staff_reply_at: datetime | None = None
+    created_at: datetime
+    updated_at: datetime
+    editable_until: datetime | None = None   # для автора: до какого момента можно править
+    can_edit: bool = False

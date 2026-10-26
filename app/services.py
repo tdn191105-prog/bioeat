@@ -344,6 +344,10 @@ def order_payload(order: Order, *, with_customer: bool = False) -> dict:
         "cancel_reason": order.cancel_reason or "",
         **pickup_snapshot(order),
     }
+    review = None if "review" in inspect(order).unloaded else order.review
+    data["review"] = (
+        {"id": review.id, "rating": review.rating} if review is not None else None
+    )
     deadline = order_deadline(order)
     data["order_deadline"] = deadline
     data["deadline_time"] = hhmm(deadline) if deadline else None
