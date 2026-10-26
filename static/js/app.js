@@ -257,6 +257,17 @@ async function loadPaymentMode() {
   if (state.user) {
     await Promise.all([loadCart().catch(() => {}), loadActiveOrders().catch(() => {})]);
   }
+  if (state.offline) {
+    el.content.innerHTML = `
+      <div class="empty">
+        <div class="empty__emoji">📡</div>
+        <div class="empty__title">Нет связи</div>
+        <div class="small">Заказы и меню появятся, когда вернётся интернет. Вход сохранён.</div>
+        <button class="btn btn--sm mt-8" onclick="location.reload()">Повторить</button>
+      </div>`;
+    window.addEventListener('online', () => window.location.reload(), { once: true });
+    return;
+  }
   if (!state.user && !window.location.hash.startsWith('#/login')) {
     window.location.hash = '#/login';
   }
@@ -281,6 +292,21 @@ async function loadPaymentMode() {
     } catch { /* не мешаем пользователю сетевыми ошибками фонового опроса */ }
   }, 20000);
 })();
+
+/* Экранная клавиатура: плавающие нижние панели не должны закрывать поле ввода.
+   Пока в текстовом поле фокус (на телефоне), панели прячем. */
+const isTextField = (el) => el && (el.tagName === 'TEXTAREA'
+  || (el.tagName === 'INPUT' && !['checkbox', 'radio', 'button', 'submit'].includes(el.type)));
+document.addEventListener('focusin', (e) => {
+  if (isTextField(e.target) && window.matchMedia('(max-width: 1023px)').matches) {
+    document.body.classList.add('keyboard-open');
+  }
+});
+document.addEventListener('focusout', () => {
+  setTimeout(() => {
+    if (!isTextField(document.activeElement)) document.body.classList.remove('keyboard-open');
+  }, 60);
+});
 
 /* Service worker — офлайн-оболочка PWA */
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {

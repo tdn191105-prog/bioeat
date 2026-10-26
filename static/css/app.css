@@ -1574,3 +1574,26 @@ table.data tbody tr:hover { background: rgba(255, 255, 255, 0.025); }
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 3s; } }
+
+/* --------------------------------------------------------------------------
+ *  Цели для пальца не меньше 44×44 (Apple HIG, WCAG 2.5.5).
+ *  Нашлось e2e-аудитом: нижняя панель, колокольчик, чипсы, степпер были 32–40 px.
+ * -------------------------------------------------------------------------- */
+.tab { min-height: 44px; }
+.icon-btn { width: 44px; height: 44px; }
+.chip-btn { height: 44px; padding: 0 12px; }
+.chip { min-height: 44px; }
+.stepper button { width: 44px; height: 44px; }
+.stepper--lg button { width: 48px; }
+.section__link { min-height: 44px; display: inline-flex; align-items: center; }
+.dish-hero__back { width: 44px; height: 44px; }
+.searchbar { padding-top: 0; padding-bottom: 0; }
+.searchbar input { min-height: 46px; }
+.add-btn { min-width: 44px; min-height: 44px; }
+/* мелкая ссылка на источник фото — текстовая, но тоже даём нормальную зону нажатия */
+.photo-credit a { display: inline-block; padding: 13px 0; margin: -13px 0; }
+.btn--sm { min-height: 44px; }
+
+/* открыта клавиатура: прячем плавающие панели, чтобы они не легли на поле ввода */
+body.keyboard-open .tabbar,
+body.keyboard-open .action-bar { display: none !important; }

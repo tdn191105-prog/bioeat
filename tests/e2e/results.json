@@ -1,0 +1,31 @@
+{
+  "iphone": {
+    "phone_checks": {
+      "landscape #/": true,
+      "landscape #/menu": true,
+      "landscape #/cart": true,
+      "320px #/menu": true,
+      "320px #/checkout": true,
+      "320px #/orders": true,
+      "320px #/profile": true,
+      "text 130% /menu": true,
+      "service worker": true,
+      "offline shell": "не проверено в этой среде: Page.reload: WebKit encountered an internal error"
+    }
+  },
+  "android": {
+    "phone_checks": {
+      "landscape #/": true,
+      "landscape #/menu": true,
+      "landscape #/cart": true,
+      "320px #/menu": true,
+      "320px #/checkout": true,
+      "320px #/orders": true,
+      "320px #/profile": true,
+      "text 130% /menu": true,
+      "service worker": true,
+      "offline shell": true,
+      "offline keeps login": true
+    }
+  }
+}

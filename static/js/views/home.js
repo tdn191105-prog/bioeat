@@ -189,16 +189,23 @@ export default async function homeView() {
         </div>
       </section>
 
-      <p class="center small muted" style="padding:0 16px">
-        Привет, ${esc(name)}. Это демонстрационная версия — оплата проходит в тестовом режиме
-        и не обращается к реальным банковским системам.
+      <p class="center small muted" style="padding:0 16px" id="home-note">
+        Привет, ${esc(name)}!
       </p>
     `,
 
     async mount(root) {
       await Promise.all([loadMenu(), loadActiveOrders().catch(() => [])]);
 
+      // пока грузились данные, пользователь мог уйти с главной — тогда ничего не рисуем
       const banners = root.querySelector('#banners');
+      if (!banners) return;
+      api.get('/api/payments/config').then((cfg) => {
+        const note = root.querySelector('#home-note');
+        if (note && cfg.demo) {
+          note.textContent = `Привет, ${name}. Это демонстрационная версия — оплата проходит в тестовом режиме и не обращается к реальным банковским системам.`;
+        }
+      }).catch(() => {});
       banners.innerHTML = bannersHtml();
 
       const dots = root.querySelector('#banner-dots');

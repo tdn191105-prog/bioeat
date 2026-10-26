@@ -34,9 +34,9 @@ DEFAULT_DEVICE = "locker-b1"
 DEV_SECRET_KEY = "dev-secret-change-me-in-production"
 
 
-def derive_secret(device_id: str, version: int = 1) -> str:
+def derive_secret(device_id: str, version: int = 1, secret_key: str | None = None) -> str:
     """Та же формула, что device_secret() на сервере."""
-    secret_key = os.environ.get("SECRET_KEY", DEV_SECRET_KEY)
+    secret_key = secret_key or os.environ.get("SECRET_KEY", DEV_SECRET_KEY)
     raw = f"locker-device:{device_id}:{version}"
     return hmac.new(secret_key.encode(), raw.encode(), hashlib.sha256).hexdigest()
 

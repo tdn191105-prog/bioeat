@@ -11,6 +11,7 @@ export const state = {
   menuLoaded: false,
   activeOrders: [],
   lastOrderId: null,
+  offline: false,
 };
 
 export function subscribe(fn) {
@@ -29,9 +30,12 @@ export async function loadUser() {
   if (!auth.token) { state.user = null; emit(); return null; }
   try {
     state.user = await api.get('/api/auth/me', { silent: true });
-  } catch {
+    state.offline = false;
+  } catch (err) {
     state.user = null;
-    auth.token = '';
+    // без сети токен не трогаем: иначе открыл приложение в метро — и тебя разлогинило
+    if (err.status === 0) state.offline = true;
+    else auth.token = '';
   }
   emit();
   return state.user;
