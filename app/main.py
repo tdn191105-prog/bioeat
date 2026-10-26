@@ -18,12 +18,28 @@ from .config import settings
 from .db import SessionLocal, create_all, engine, ensure_columns
 from .routers import admin, auth, cart, menu, operator, orders
 from .seed import seed
+from .services import expire_unpaid_orders
 
 log = logging.getLogger("rospit")
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 STATIC_DIR = BASE_DIR / "static"
+
+
+async def _expire_unpaid_loop() -> None:
+    """Фоновая уборка брошенных неоплаченных заказов (без Celery)."""
+    import asyncio
+
+    while True:
+        await asyncio.sleep(settings.expire_sweep_seconds)
+        try:
+            async with SessionLocal() as session:
+                expired = await expire_unpaid_orders(session)
+            if expired:
+                log.info("Отменено неоплаченных заказов по сроку: %s", expired)
+        except Exception as exc:
+            log.warning("Уборка неоплаченных заказов не удалась: %s", exc)
 
 
 @asynccontextmanager
@@ -52,7 +68,10 @@ async def lifespan(app: FastAPI):
     async with SessionLocal() as session:
         result = await seed(session)
     log.info("РосПит запущен. Seed: %s", result)
+
+    sweeper = asyncio.create_task(_expire_unpaid_loop())
     yield
+    sweeper.cancel()
 
     # закрываем пул: рабочий поток aiosqlite не демонический и иначе
     # не даёт процессу завершиться (заметно в тестах и при Ctrl+C)

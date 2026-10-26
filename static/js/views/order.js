@@ -57,14 +57,22 @@ export default async function orderView(ctx) {
       const body = root.querySelector('#order-body');
 
       const render = () => {
-        const cancellable = ['created', 'paid', 'accepted'].includes(order.status);
+        // правило отмены считает сервер: до отсечки перемены — сам, после — через оператора
+        const cancellable = order.can_cancel;
+        const lockedByDeadline = ['paid', 'accepted'].includes(order.status) && !order.can_cancel;
         body.innerHTML = `
           ${
             order.status === 'cancelled'
               ? `<section class="section center">
                    <div style="font-size:46px">🚫</div>
                    <div class="bold mt-8">Заказ отменён</div>
-                   <div class="small muted">Бонусы и оплата возвращены</div>
+                   <div class="small muted">${
+                     order.cancel_reason === 'expired'
+                       ? 'Время на оплату вышло — порции вернулись в меню. Оформите заказ заново.'
+                       : order.cancel_reason === 'deadline'
+                         ? `Приём заказов на перемену закрылся в ${esc(order.deadline_time || '')}. Деньги не списаны.`
+                         : 'Бонусы и оплата возвращены'
+                   }</div>
                  </section>`
               : ''
           }
@@ -102,6 +110,7 @@ export default async function orderView(ctx) {
               <div class="row"><span class="row__label">Дата</span><span class="bold">${dateLabel(order.pickup_date)}</span></div>
               <div class="row"><span class="row__label">Окно выдачи</span><span class="bold nowrap">${esc(order.slot_label)}</span></div>
               <div class="row"><span class="row__label">Точка</span><span class="bold" style="text-align:right">${esc(order.pickup_point)}</span></div>
+              ${order.deadline_time && !['issued', 'cancelled'].includes(order.status) ? `<div class="row"><span class="row__label">Приём заказов</span><span class="bold">до ${esc(order.deadline_time)}</span></div>` : ''}
               ${order.comment ? `<div class="row"><span class="row__label">Комментарий</span><span style="text-align:right">${esc(order.comment)}</span></div>` : ''}
             </div>
           </section>
@@ -141,6 +150,7 @@ export default async function orderView(ctx) {
               : ''
           }
           ${cancellable ? '<button class="btn btn--danger" data-cancel>Отменить заказ</button>' : ''}
+          ${lockedByDeadline ? `<div class="small muted center">Приём заказов закрылся в ${esc(order.deadline_time || '')} — кухня уже собирает. Отменить заказ можно через оператора на выдаче.</div>` : ''}
           <button class="btn btn--ghost" data-goto="#/orders">Все мои заказы</button>`;
 
         const repeat = body.querySelector('[data-repeat]');

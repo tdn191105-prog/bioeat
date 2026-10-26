@@ -13,6 +13,7 @@ from pathlib import Path
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from .config import settings
 from .db import SessionLocal, create_all, engine, ensure_columns
 from .dish_details import DISH_DETAILS
 from .models import Category, Dish, PickupSlot, User, UserRole
@@ -301,6 +302,7 @@ async def seed(session: AsyncSession, force: bool = False) -> dict:
                 starts_at=start,
                 ends_at=end,
                 capacity=cap,
+                order_cutoff_minutes=settings.default_order_cutoff_minutes,
                 point=point,
                 sort_order=sort,
             )

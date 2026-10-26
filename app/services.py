@@ -6,7 +6,7 @@ from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 
 from fastapi import HTTPException
-from sqlalchemy import func, select
+from sqlalchemy import func, inspect, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .config import settings
@@ -51,11 +51,23 @@ ALLOWED_TRANSITIONS: dict[OrderStatus, set[OrderStatus]] = {
 MAX_BONUS_SHARE = Decimal("0.30")  # бонусами можно закрыть не больше 30% чека
 
 
+# Остановленные часы кампуса — только для тестов и записи демо-ролика.
+_frozen_now: datetime | None = None
+
+
 def campus_now() -> datetime:
     """Текущее время кампуса (Москва) без таймзоны."""
+    if _frozen_now is not None:
+        return _frozen_now
     return datetime.now(UTC).replace(tzinfo=None) + timedelta(
         hours=settings.tz_offset_hours
     )
+
+
+def freeze_campus_now(value: datetime | None) -> None:
+    """Подменяет «сейчас» кампуса. None возвращает настоящие часы."""
+    global _frozen_now
+    _frozen_now = value
 
 
 def campus_today() -> date:
@@ -163,8 +175,47 @@ async def clear_cart(session: AsyncSession, user: User) -> None:
 
 
 # --------------------------------------------------------------------------- #
-#  Слоты
+#  Слоты и отсечка приёма заказов
 # --------------------------------------------------------------------------- #
+def slot_cutoff_minutes(slot: PickupSlot) -> int:
+    value = slot.order_cutoff_minutes
+    return settings.default_order_cutoff_minutes if value is None else int(value)
+
+
+def slot_deadline(slot: PickupSlot, on_date: date) -> datetime:
+    """Момент (время кампуса), после которого заказ на эту перемену не принимается.
+
+    Единственное место, где считается отсечка: её используют список окон,
+    оформление, оплата и проверка отмены. Действует для любой даты —
+    заказ на завтрашнюю 9:30 при отсечке 60 минут закрывается завтра в 8:30.
+    """
+    return datetime.combine(on_date, slot.starts_at) - timedelta(minutes=slot_cutoff_minutes(slot))
+
+
+def _loaded_slot(order: Order) -> PickupSlot | None:
+    """Окно заказа, если оно уже загружено, — без ленивого запроса в async-коде."""
+    state = inspect(order)
+    if "slot" in state.unloaded:
+        return None
+    return order.slot
+
+
+def order_deadline(order: Order) -> datetime | None:
+    slot = _loaded_slot(order)
+    if slot is None:
+        return None
+    return slot_deadline(slot, order.pickup_date)
+
+
+def is_past_deadline(order: Order) -> bool:
+    deadline = order_deadline(order)
+    return deadline is not None and campus_now() >= deadline
+
+
+def hhmm(moment: datetime) -> str:
+    return moment.strftime("%H:%M")
+
+
 async def slot_load(session: AsyncSession, slot_id: int, on_date: date) -> int:
     return int(
         await session.scalar(
@@ -193,10 +244,12 @@ async def slots_payload(session: AsyncSession, on_date: date | None = None) -> l
     for slot in slots:
         taken = await slot_load(session, slot.id, on_date)
         left = max(0, slot.capacity - taken)
-        # слот на сегодня закрывается за 10 минут до начала выдачи
-        deadline = datetime.combine(on_date, slot.starts_at) - timedelta(minutes=10)
-        in_future = now < deadline
-        available = slot.is_active and left > 0 and in_future
+        deadline = slot_deadline(slot, on_date)
+        is_open = now < deadline
+        available = slot.is_active and left > 0 and is_open
+        # округляем вверх: «осталось 1 мин», пока приём ещё идёт
+        seconds_left = (deadline - now).total_seconds()
+        closes_in = max(0, int(-(-seconds_left // 60))) if is_open else 0
         out.append(
             {
                 "id": slot.id,
@@ -210,6 +263,11 @@ async def slots_payload(session: AsyncSession, on_date: date | None = None) -> l
                 "left": left,
                 "is_available": available,
                 "is_active": slot.is_active,
+                "is_open": is_open,
+                "order_cutoff_minutes": slot_cutoff_minutes(slot),
+                "order_deadline": deadline,
+                "deadline_time": hhmm(deadline),
+                "closes_in_minutes": closes_in,
             }
         )
     return out
@@ -271,11 +329,33 @@ def order_payload(order: Order, *, with_customer: bool = False) -> dict:
         "ready_at": order.ready_at,
         "issued_at": order.issued_at,
         "items": sorted(order.items, key=lambda i: i.id),
+        "cancel_reason": order.cancel_reason or "",
     }
+    deadline = order_deadline(order)
+    data["order_deadline"] = deadline
+    data["deadline_time"] = hhmm(deadline) if deadline else None
+    data["can_cancel"] = student_can_cancel(order)
+    if order.status == OrderStatus.created and order.created_at:
+        # время UTC, как и created_at: клиент показывает обратный отсчёт оплаты
+        data["pay_until"] = order.created_at + timedelta(minutes=settings.unpaid_order_ttl_minutes)
     if with_customer and order.user is not None:
         data["customer_name"] = order.user.full_name
         data["customer_group"] = order.user.group_name
     return data
+
+
+def student_can_cancel(order: Order) -> bool:
+    """Правило отмены самим студентом.
+
+    Неоплаченный заказ можно отменить всегда — денег ещё нет. Оплаченный — только
+    до отсечки перемены: после неё кухня собирает заказы, и отмена означает возврат
+    денег за уже собранное. Тогда отменяет оператор столовой.
+    """
+    if order.status == OrderStatus.created:
+        return True
+    if order.status not in (OrderStatus.paid, OrderStatus.accepted):
+        return False
+    return not is_past_deadline(order)
 
 
 async def create_order(
@@ -297,13 +377,18 @@ async def create_order(
     if slot is None or not slot.is_active:
         raise HTTPException(status_code=404, detail="Время выдачи недоступно")
 
-    if on_date == campus_today():
-        deadline = datetime.combine(on_date, slot.starts_at) - timedelta(minutes=10)
-        if campus_now() >= deadline:
-            raise HTTPException(
-                status_code=409,
-                detail=f"Приём заказов на «{slot.label}» уже закрыт. Выберите другое время.",
-            )
+    deadline = slot_deadline(slot, on_date)
+    if campus_now() >= deadline:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"Приём заказов на «{slot.label}» закрыт в {hhmm(deadline)}. "
+                "Выберите другое время."
+            ),
+        )
+
+    # брошенные неоплаченные заказы не должны держать порции и места
+    await expire_unpaid_orders(session)
 
     taken = await slot_load(session, slot.id, on_date)
     if taken >= slot.capacity:
@@ -375,6 +460,7 @@ async def create_order(
         pickup_code=make_pickup_code(number),
         items=order_items,
     )
+    order.slot = slot
     session.add(order)
 
     if bonus_used:
@@ -397,16 +483,25 @@ async def restore_stock(session: AsyncSession, order: Order) -> None:
             dish.stock_qty += item.qty
 
 
-async def cancel_order(session: AsyncSession, order: Order, refund: bool = True) -> Order:
+async def cancel_order(
+    session: AsyncSession, order: Order, refund: bool = True, reason: str = ""
+) -> Order:
     if order.status in (OrderStatus.issued, OrderStatus.cancelled):
         raise HTTPException(status_code=409, detail="Заказ уже закрыт")
 
+    was_paid = order.status != OrderStatus.created
     await restore_stock(session, order)
 
-    if order.bonus_used and refund:
-        user = await session.get(User, order.user_id)
-        if user:
-            user.bonus_balance = money(money(user.bonus_balance) + money(order.bonus_used))
+    user = await session.get(User, order.user_id)
+    if user is not None:
+        balance = money(user.bonus_balance)
+        if order.bonus_used and refund:
+            balance += money(order.bonus_used)
+        # кэшбэк начислялся при оплате — забираем его обратно, но не в минус:
+        # бонусы могли быть уже потрачены на другой заказ
+        if was_paid and order.bonus_earned:
+            balance = max(Decimal("0.00"), balance - money(order.bonus_earned))
+        user.bonus_balance = money(balance)
 
     if order.status != OrderStatus.created and refund:
         for payment in order.payments:
@@ -415,9 +510,62 @@ async def cancel_order(session: AsyncSession, order: Order, refund: bool = True)
 
     order.status = OrderStatus.cancelled
     order.cancelled_at = utcnow()
+    order.cancel_reason = reason
     await session.commit()
     await session.refresh(order, ["items", "payments", "user"])
     return order
+
+
+def unpaid_is_stale(order: Order, now_utc: datetime | None = None) -> bool:
+    """Неоплаченный заказ просрочен: вышло время на оплату или прошла отсечка."""
+    if order.status != OrderStatus.created:
+        return False
+    now_utc = now_utc or utcnow()
+    ttl = timedelta(minutes=settings.unpaid_order_ttl_minutes)
+    return (order.created_at and order.created_at + ttl <= now_utc) or is_past_deadline(order)
+
+
+async def expire_order_if_stale(session: AsyncSession, order: Order) -> bool:
+    if not unpaid_is_stale(order):
+        return False
+    reason = "deadline" if is_past_deadline(order) else "expired"
+    await cancel_order(session, order, reason=reason)
+    return True
+
+
+async def expire_unpaid_orders(session: AsyncSession) -> int:
+    """Отменяет брошенные неоплаченные заказы и возвращает порции и бонусы.
+
+    Вызывается лениво (при оформлении, просмотре заказа, на экране кухни)
+    и фоновой задачей из lifespan — без Celery.
+    """
+    created = (
+        await session.scalars(select(Order).where(Order.status == OrderStatus.created))
+    ).unique().all()
+    expired = 0
+    now_utc = utcnow()
+    for order in created:
+        if unpaid_is_stale(order, now_utc):
+            reason = "deadline" if is_past_deadline(order) else "expired"
+            await cancel_order(session, order, reason=reason)
+            expired += 1
+    return expired
+
+
+def cancelled_message(order: Order) -> str:
+    if order.cancel_reason == "deadline":
+        deadline = order_deadline(order)
+        when = f" в {hhmm(deadline)}" if deadline else ""
+        return (
+            f"Приём заказов на эту перемену закрылся{when}. Заказ отменён, "
+            "деньги не списаны, порции и бонусы возвращены."
+        )
+    if order.cancel_reason == "expired":
+        return (
+            f"Время на оплату вышло ({settings.unpaid_order_ttl_minutes} мин). "
+            "Заказ отменён — оформите его заново."
+        )
+    return "Заказ отменён"
 
 
 # --------------------------------------------------------------------------- #
@@ -434,10 +582,14 @@ async def pay_order(
     Возвращает (успех, сообщение, номер транзакции).
     """
     if order.status == OrderStatus.cancelled:
-        raise HTTPException(status_code=409, detail="Заказ отменён")
+        raise HTTPException(status_code=409, detail=cancelled_message(order))
     if order.status != OrderStatus.created:
         # идемпотентность: повторный запрос не списывает второй раз
         return True, "Заказ уже оплачен", ""
+    # отсечку и срок оплаты проверяем до списания: открыл оплату в 10:59,
+    # нажал «Оплатить» в 11:02 — деньги не списываются
+    if await expire_order_if_stale(session, order):
+        raise HTTPException(status_code=409, detail=cancelled_message(order))
 
     provider_ref = f"DEMO-{random.randint(100000, 999999)}"
     payment = Payment(

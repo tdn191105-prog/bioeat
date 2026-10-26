@@ -154,6 +154,11 @@ class SlotOut(BaseModel):
     left: int
     is_available: bool
     is_active: bool
+    is_open: bool = True
+    order_cutoff_minutes: int = 60
+    order_deadline: datetime | None = None   # время кампуса
+    deadline_time: str = ""                  # «11:00»
+    closes_in_minutes: int = 0
 
 
 class SlotIn(BaseModel):
@@ -161,6 +166,8 @@ class SlotIn(BaseModel):
     starts_at: str  # "10:00"
     ends_at: str    # "10:25"
     capacity: int = Field(default=60, ge=1, le=100000)
+    # None — значение по умолчанию из DEFAULT_ORDER_CUTOFF_MINUTES
+    order_cutoff_minutes: int | None = Field(default=None, ge=0, le=24 * 60)
     point: str = "Окно «Экспресс-выдача»"
     is_active: bool = True
     sort_order: int = 0
@@ -171,6 +178,7 @@ class SlotPatch(BaseModel):
     starts_at: str | None = None
     ends_at: str | None = None
     capacity: int | None = Field(default=None, ge=1, le=100000)
+    order_cutoff_minutes: int | None = Field(default=None, ge=0, le=24 * 60)
     point: str | None = None
     is_active: bool | None = None
     sort_order: int | None = None
@@ -245,6 +253,11 @@ class OrderOut(BaseModel):
     items: list[OrderItemOut]
     customer_name: str | None = None
     customer_group: str | None = None
+    cancel_reason: str = ""
+    order_deadline: datetime | None = None   # отсечка перемены, время кампуса
+    deadline_time: str | None = None
+    can_cancel: bool = False                 # может ли студент отменить сам
+    pay_until: datetime | None = None        # UTC: до какого момента ждём оплату
 
 
 class PayIn(BaseModel):

@@ -96,12 +96,26 @@ export default async function checkoutView() {
               <span class="slot-load__text">${esc(words)} · ${slot.left} из ${slot.capacity}</span>
             </div>`;
         };
+        /* Отсечку считает сервер (время кампуса), клиент только показывает. */
+        const deadlineLine = (slot) => {
+          if (!slot.is_open) {
+            return `<span class="slot-deadline slot-deadline--closed">приём закрыт в ${esc(slot.deadline_time)}</span>`;
+          }
+          const mins = slot.closes_in_minutes;
+          if (mins <= 90) {
+            const text = mins >= 60 ? `${Math.floor(mins / 60)} ч ${mins % 60} мин` : `${mins} мин`;
+            return `<span class="slot-deadline ${mins <= 30 ? 'slot-deadline--soon' : ''}">приём до ${esc(slot.deadline_time)} · осталось ${text}</span>`;
+          }
+          return `<span class="slot-deadline">приём до ${esc(slot.deadline_time)}</span>`;
+        };
+
         slotsHost.innerHTML = `
           ${
             anyAvailable
               ? ''
               : `<div class="card small muted" style="border:1px solid rgba(240,180,41,.3)">
-                   Приём заказов на сегодня уже закрыт — выберите завтрашний день выше.
+                   Приём заказов на этот день уже закрыт: заказ принимаем заранее, чтобы кухня
+                   успела собрать все заказы перемены. Выберите другой день выше.
                  </div>`
           }
           ${form.slots
@@ -113,10 +127,11 @@ export default async function checkoutView() {
                 <span class="option__body">
                   <span class="option__title">${esc(s.label)} · ${esc(s.time_range)}</span>
                   <span class="option__sub">${esc(s.point)}</span>
+                  ${deadlineLine(s)}
                   ${loadBar(s)}
                 </span>
                 <span class="option__right">
-                  ${s.is_available ? '' : s.left <= 0 ? 'мест нет' : 'закрыто'}
+                  ${s.is_available ? '' : !s.is_open ? 'закрыто' : s.left <= 0 ? 'мест нет' : 'закрыто'}
                 </span>
               </button>`,
             )

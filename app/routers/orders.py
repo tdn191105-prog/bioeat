@@ -13,7 +13,18 @@ from ..db import get_session
 from ..deps import current_user
 from ..models import ACTIVE_STATUSES, Order, OrderStatus, User, UserRole
 from ..schemas import OrderCreateIn, OrderOut, PayIn, PayOut
-from ..services import cancel_order, create_order, order_payload, pay_order, repeat_order
+from ..services import (
+    cancel_order,
+    create_order,
+    expire_order_if_stale,
+    expire_unpaid_orders,
+    hhmm,
+    is_past_deadline,
+    order_deadline,
+    order_payload,
+    pay_order,
+    repeat_order,
+)
 
 router = APIRouter(prefix="/api/orders", tags=["orders"])
 
@@ -45,6 +56,7 @@ async def my_orders(
     user: User = Depends(current_user),
     session: AsyncSession = Depends(get_session),
 ):
+    await expire_unpaid_orders(session)
     stmt = select(Order).where(Order.user_id == user.id)
     if active_only:
         stmt = stmt.where(Order.status.in_((OrderStatus.created, *ACTIVE_STATUSES)))
@@ -60,6 +72,7 @@ async def get_order(
     session: AsyncSession = Depends(get_session),
 ):
     order = await _load_order(session, order_id, user)
+    await expire_order_if_stale(session, order)
     return order_payload(order, with_customer=user.role != UserRole.student)
 
 
@@ -87,14 +100,20 @@ async def cancel(
     session: AsyncSession = Depends(get_session),
 ):
     order = await _load_order(session, order_id, user)
-    if user.role == UserRole.student and order.status in (
-        OrderStatus.cooking,
-        OrderStatus.ready,
-    ):
-        raise HTTPException(
-            status_code=409,
-            detail="Заказ уже готовится. Отмена возможна только через оператора столовой.",
-        )
+    if user.role == UserRole.student and order.status != OrderStatus.created:
+        if order.status not in (OrderStatus.paid, OrderStatus.accepted):
+            raise HTTPException(
+                status_code=409,
+                detail="Заказ уже готовится. Отмена возможна только через оператора столовой.",
+            )
+        if is_past_deadline(order):
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    f"Приём заказов на перемену закрылся в {hhmm(order_deadline(order))} — "
+                    "кухня уже собирает заказ. Отменить его можно только через оператора столовой."
+                ),
+            )
     order = await cancel_order(session, order)
     return order_payload(order)
 

@@ -1440,3 +1440,14 @@ table.data tbody tr:hover { background: rgba(255, 255, 255, 0.025); }
   clip: rect(0 0 0 0);
   white-space: nowrap;
 }
+
+/* Отсечка приёма заказов под названием перемены */
+.slot-deadline {
+  display: block;
+  margin-top: 4px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+.slot-deadline--soon { color: var(--orange); }
+.slot-deadline--closed { color: var(--text-3); }

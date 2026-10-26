@@ -535,11 +535,12 @@ export default async function adminView() {
           <div class="stack">
             <button class="btn" id="add-slot">＋ Добавить окно выдачи</button>
             <div class="small muted" style="padding-left:4px">
-              Окна привязаны к расписанию перемен. Приём заказов на окно закрывается за 10 минут до начала выдачи.
+              Окна привязаны к расписанию перемен. Приём заказов закрывается за N минут до начала выдачи —
+              столько кухне нужно, чтобы собрать все заказы перемены разом.
             </div>
             <section class="section">
               <div class="table-wrap"><table class="data">
-                <thead><tr><th>Окно</th><th>Время</th><th>Точка</th><th>Вместимость</th><th>Занято сегодня</th><th>Активно</th></tr></thead>
+                <thead><tr><th>Окно</th><th>Время</th><th>Точка</th><th>Вместимость</th><th>Приём закрывается за, мин</th><th>Занято сегодня</th><th>Активно</th></tr></thead>
                 <tbody>
                   ${slots
                     .map(
@@ -549,6 +550,9 @@ export default async function adminView() {
                       <td class="nowrap">${esc(s.time_range)}</td>
                       <td class="small muted">${esc(s.point)}</td>
                       <td><input class="input" style="width:80px;padding:7px" type="number" min="1" value="${s.capacity}" data-cap="${s.id}"></td>
+                      <td class="nowrap"><input class="input" style="width:80px;padding:7px" type="number" min="0" max="1440" step="5"
+                            value="${s.order_cutoff_minutes}" data-cutoff="${s.id}" aria-label="Приём закрывается за N минут">
+                          <div class="small muted">до ${esc(s.deadline_time)}</div></td>
                       <td>${s.taken} / ${s.capacity}</td>
                       <td><span class="switch ${s.is_active ? 'is-on' : ''}" data-slot-toggle="${s.id}"></span></td>
                     </tr>`,
@@ -571,8 +575,12 @@ export default async function adminView() {
                 <div class="field"><label class="field__label" for="s-to">Конец</label>
                   <input class="input" id="s-to" type="time" value="15:20"></div>
               </div>
-              <div class="field"><label class="field__label" for="s-cap">Сколько заказов принимаем</label>
-                <input class="input" id="s-cap" type="number" min="1" value="50"></div>
+              <div class="grid-2">
+                <div class="field"><label class="field__label" for="s-cap">Сколько заказов принимаем</label>
+                  <input class="input" id="s-cap" type="number" min="1" value="50"></div>
+                <div class="field"><label class="field__label" for="s-cutoff">Приём заказов закрывается за N минут</label>
+                  <input class="input" id="s-cutoff" type="number" min="0" max="1440" step="5" value="60"></div>
+              </div>
               <div class="field"><label class="field__label" for="s-point">Точка выдачи</label>
                 <input class="input" id="s-point" value="Окно «Экспресс-выдача», корпус А"></div>
               <button class="btn" id="s-save">Добавить</button>
@@ -586,6 +594,7 @@ export default async function adminView() {
                   starts_at: sheet.querySelector('#s-from').value,
                   ends_at: sheet.querySelector('#s-to').value,
                   capacity: Number(sheet.querySelector('#s-cap').value || 50),
+                  order_cutoff_minutes: Number(sheet.querySelector('#s-cutoff').value || 0),
                   point: sheet.querySelector('#s-point').value.trim(),
                   sort_order: (slots.length + 1) * 10,
                 };
@@ -613,6 +622,20 @@ export default async function adminView() {
             } catch (err) {
               toast(err.message, 'err');
               sw.classList.toggle('is-on', !next);
+            }
+          };
+        });
+
+        panel.querySelectorAll('[data-cutoff]').forEach((input) => {
+          input.onchange = async () => {
+            try {
+              await api.patch(`/api/admin/slots/${input.dataset.cutoff}`, {
+                order_cutoff_minutes: Math.min(1440, Math.max(0, Number(input.value || 0))),
+              });
+              toast('Время приёма заказов обновлено');
+              renderPanel();
+            } catch (err) {
+              toast(err.message, 'err');
             }
           };
         });

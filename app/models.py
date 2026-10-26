@@ -158,6 +158,8 @@ class PickupSlot(Base):
     starts_at: Mapped[time] = mapped_column(Time)
     ends_at: Mapped[time] = mapped_column(Time)
     capacity: Mapped[int] = mapped_column(Integer, default=60)
+    # приём заказов закрывается за N минут до начала выдачи — кухня собирает всё разом
+    order_cutoff_minutes: Mapped[int] = mapped_column(Integer, default=60)
     point: Mapped[str] = mapped_column(String(120), default="Окно «Экспресс-выдача»")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
@@ -229,8 +231,11 @@ class Order(Base):
     ready_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     issued_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     cancelled_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # почему отменён: expired — не оплатили вовремя, deadline — оплата после отсечки
+    cancel_reason: Mapped[str] = mapped_column(String(40), default="")
 
     user: Mapped[User] = relationship(back_populates="orders", lazy="joined")
+    slot: Mapped[PickupSlot | None] = relationship(lazy="joined")
     items: Mapped[list[OrderItem]] = relationship(
         back_populates="order", cascade="all, delete-orphan", lazy="selectin"
     )

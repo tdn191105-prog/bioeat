@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..config import settings
 from ..db import get_session
 from ..deps import admin_required
 from ..images import (
@@ -40,6 +41,7 @@ from ..schemas import (
     DishPatch,
     SlotIn,
     SlotOut,
+    SlotPatch,
     StatsOut,
     UserOut,
 )
@@ -312,6 +314,11 @@ async def create_slot(data: SlotIn, session: AsyncSession = Depends(get_session)
         starts_at=starts,
         ends_at=ends,
         capacity=data.capacity,
+        order_cutoff_minutes=(
+            settings.default_order_cutoff_minutes
+            if data.order_cutoff_minutes is None
+            else data.order_cutoff_minutes
+        ),
         point=data.point,
         is_active=data.is_active,
         sort_order=data.sort_order,
@@ -324,17 +331,18 @@ async def create_slot(data: SlotIn, session: AsyncSession = Depends(get_session)
 
 
 @router.patch("/slots/{slot_id}", response_model=SlotOut)
-async def update_slot(slot_id: int, data: dict, session: AsyncSession = Depends(get_session)):
+async def update_slot(slot_id: int, data: SlotPatch, session: AsyncSession = Depends(get_session)):
     slot = await session.get(PickupSlot, slot_id)
     if slot is None:
         raise HTTPException(status_code=404, detail="Слот не найден")
-    for field in ("label", "point", "capacity", "is_active", "sort_order"):
-        if field in data and data[field] is not None:
-            setattr(slot, field, data[field])
-    if data.get("starts_at"):
-        slot.starts_at = parse_time(data["starts_at"])
-    if data.get("ends_at"):
-        slot.ends_at = parse_time(data["ends_at"])
+    fields = data.model_dump(exclude_unset=True, exclude_none=True)
+    for field in ("label", "point", "capacity", "order_cutoff_minutes", "is_active", "sort_order"):
+        if field in fields:
+            setattr(slot, field, fields[field])
+    if fields.get("starts_at"):
+        slot.starts_at = parse_time(fields["starts_at"])
+    if fields.get("ends_at"):
+        slot.ends_at = parse_time(fields["ends_at"])
     if slot.ends_at <= slot.starts_at:
         raise HTTPException(status_code=422, detail="Окончание должно быть позже начала")
     await session.commit()
