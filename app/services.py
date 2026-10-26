@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .config import settings
 from .models import (
     ACTIVE_STATUSES,
+    TO_COLLECT_STATUSES,
     Cart,
     CartItem,
     Dish,
@@ -33,17 +34,22 @@ STATUS_LABELS = {
     OrderStatus.accepted: "Принят кухней",
     OrderStatus.cooking: "Комплектуется",
     OrderStatus.ready: "Готов к выдаче",
+    OrderStatus.in_locker: "В ячейке постамата",
     OrderStatus.issued: "Выдан",
     OrderStatus.cancelled: "Отменён",
 }
 
 # Разрешённые переходы статусов — защищают от рассинхрона на экране оператора.
+# Шаги accepted / cooking необязательны: после отсечки кухня собирает перемену
+# разом и сразу отмечает «Собран» (paid → ready).
 ALLOWED_TRANSITIONS: dict[OrderStatus, set[OrderStatus]] = {
     OrderStatus.created: {OrderStatus.paid, OrderStatus.cancelled},
-    OrderStatus.paid: {OrderStatus.accepted, OrderStatus.cancelled},
+    OrderStatus.paid: {OrderStatus.accepted, OrderStatus.cooking, OrderStatus.ready, OrderStatus.cancelled},
     OrderStatus.accepted: {OrderStatus.cooking, OrderStatus.ready, OrderStatus.cancelled},
     OrderStatus.cooking: {OrderStatus.ready, OrderStatus.cancelled},
-    OrderStatus.ready: {OrderStatus.issued, OrderStatus.cancelled},
+    # в ячейку кладут только через отдельное действие с назначением ячейки
+    OrderStatus.ready: {OrderStatus.issued, OrderStatus.in_locker, OrderStatus.cancelled},
+    OrderStatus.in_locker: {OrderStatus.issued, OrderStatus.cancelled},
     OrderStatus.issued: set(),
     OrderStatus.cancelled: set(),
 }
@@ -639,6 +645,7 @@ async def popular_dish_ids(session: AsyncSession, days: int = 7, limit: int = 6)
         OrderStatus.accepted,
         OrderStatus.cooking,
         OrderStatus.ready,
+        OrderStatus.in_locker,
         OrderStatus.issued,
     )
     rows = (
@@ -692,3 +699,123 @@ async def repeat_order(session: AsyncSession, user: User, order: Order) -> dict:
         "skipped": skipped,
         "cart": await cart_payload(session, user),
     }
+
+
+# --------------------------------------------------------------------------- #
+#  Смена кухни: заказы по переменам
+# --------------------------------------------------------------------------- #
+def collect_summary(orders: list[Order]) -> list[dict]:
+    """«Что собрать»: блюдо → сколько порций на перемену, больше — выше."""
+    totals: dict[str, int] = {}
+    for order in orders:
+        for item in order.items:
+            totals[item.name] = totals.get(item.name, 0) + item.qty
+    return [
+        {"name": name, "qty": qty}
+        for name, qty in sorted(totals.items(), key=lambda kv: (-kv[1], kv[0]))
+    ]
+
+
+async def shift_payload(session: AsyncSession, on_date: date) -> dict:
+    """Перемены дня: отсечка, счётчики по статусам, сводка сборки и заказы."""
+    await expire_unpaid_orders(session)
+    now = campus_now()
+    slots = (
+        await session.scalars(select(PickupSlot).order_by(PickupSlot.sort_order, PickupSlot.starts_at))
+    ).all()
+    orders = (
+        await session.scalars(
+            select(Order)
+            .where(
+                Order.pickup_date == on_date,
+                Order.status.in_((*ACTIVE_STATUSES, OrderStatus.issued)),
+            )
+            .order_by(Order.paid_at, Order.created_at)
+        )
+    ).unique().all()
+
+    by_slot: dict[int | None, list[Order]] = {}
+    for order in orders:
+        by_slot.setdefault(order.slot_id, []).append(order)
+
+    def section(slot: PickupSlot | None, items: list[Order]) -> dict:
+        counts = {s.value: 0 for s in (*ACTIVE_STATUSES, OrderStatus.issued)}
+        for order in items:
+            counts[order.status.value] += 1
+        to_collect = [o for o in items if o.status in TO_COLLECT_STATUSES]
+        active = [o for o in items if o.status in ACTIVE_STATUSES]
+        data = {
+            "id": slot.id if slot else None,
+            "label": slot.label if slot else "Окно удалено",
+            "time_range": slot.time_range if slot else "",
+            "starts_at": slot.starts_at.strftime("%H:%M") if slot else "",
+            "point": slot.point if slot else (items[0].pickup_point if items else ""),
+            "is_active": slot.is_active if slot else False,
+            "counts": counts,
+            "total": len(active),
+            "to_collect_count": len(to_collect),
+            "to_collect": collect_summary(to_collect),
+            "all_items": collect_summary(active),
+            "orders": [order_payload(o, with_customer=True) for o in active],
+            "is_locker": False,
+            "locker": None,
+        }
+        if slot is not None:
+            deadline = slot_deadline(slot, on_date)
+            ends = datetime.combine(on_date, slot.ends_at)
+            data.update(
+                deadline_time=hhmm(deadline),
+                intake_closed=now >= deadline,
+                is_over=now >= ends,
+            )
+        else:
+            data.update(deadline_time="", intake_closed=True, is_over=False)
+        return data
+
+    sections = [
+        section(slot, by_slot.get(slot.id, []))
+        for slot in slots
+        if slot.is_active or by_slot.get(slot.id)
+    ]
+    if by_slot.get(None):
+        sections.append(section(None, by_slot[None]))
+
+    # текущая или ближайшая перемена: первая незакончившаяся, где есть что делать
+    current = None
+    if on_date == now.date():
+        current = next(
+            (s["id"] for s in sections if not s["is_over"] and s["total"]),
+            next((s["id"] for s in sections if not s["is_over"]), None),
+        )
+        if current is None:
+            # перемены закончились, а невыданные заказы остались — их и показываем
+            current = next((s["id"] for s in sections if s["total"]), None)
+    else:
+        current = next((s["id"] for s in sections if s["total"]), None)
+
+    return {
+        "date": on_date,
+        "now": now,
+        "current_slot_id": current,
+        "slots": sections,
+        "issued_count": sum(s["counts"]["issued"] for s in sections),
+        "active_count": sum(s["total"] for s in sections),
+    }
+
+
+async def mark_slot_collected(session: AsyncSession, slot_id: int, on_date: date) -> int:
+    """Массовое «Собран» по перемене: все ещё не собранные заказы → ready."""
+    stmt = select(Order).where(
+        Order.slot_id == slot_id,
+        Order.pickup_date == on_date,
+        Order.status.in_(TO_COLLECT_STATUSES),
+    )
+    if not settings.is_sqlite:
+        stmt = stmt.with_for_update()
+    orders = (await session.scalars(stmt)).unique().all()
+    stamp = utcnow()
+    for order in orders:
+        order.status = OrderStatus.ready
+        order.ready_at = stamp
+    await session.commit()
+    return len(orders)

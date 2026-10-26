@@ -86,7 +86,7 @@ function renderNav(path) {
 
   const staffLinks = [];
   if (isStaff()) {
-    staffLinks.push({ href: '#/operator', icon: '👨‍🍳', label: 'Экран оператора', match: (p) => p === '/operator' });
+    staffLinks.push({ href: '#/operator', icon: '👨‍🍳', label: 'Кабинет столовой', match: (p) => p === '/operator' });
   }
   if (isAdmin()) {
     staffLinks.push({ href: '#/admin', icon: '⚙️', label: 'Админ-панель', match: (p) => p === '/admin' });
@@ -113,7 +113,7 @@ function renderNav(path) {
 }
 
 function updateBell() {
-  const active = state.activeOrders.filter((o) => o.status === 'ready').length;
+  const active = state.activeOrders.filter((o) => ['ready', 'in_locker'].includes(o.status)).length;
   el.bell.querySelector('.badge-dot')?.remove();
   if (active) {
     const dot = document.createElement('span');
@@ -217,7 +217,7 @@ el.actionBar.addEventListener('click', (event) => {
 
 el.back.addEventListener('click', () => window.history.back());
 el.bell.addEventListener('click', () => {
-  const ready = state.activeOrders.find((o) => o.status === 'ready');
+  const ready = state.activeOrders.find((o) => ['ready', 'in_locker'].includes(o.status));
   if (ready) { go(`#/order/${ready.id}`); return; }
   const active = state.activeOrders[0];
   if (active) { go(`#/order/${active.id}`); return; }
@@ -255,10 +255,10 @@ window.addEventListener('hashchange', () => {
   setInterval(async () => {
     if (!state.user || state.user.role !== 'student') return;
     try {
-      const before = new Set(state.activeOrders.filter((o) => o.status === 'ready').map((o) => o.id));
+      const before = new Set(state.activeOrders.filter((o) => ['ready', 'in_locker'].includes(o.status)).map((o) => o.id));
       await loadActiveOrders();
       state.activeOrders
-        .filter((o) => o.status === 'ready' && !before.has(o.id) && !readyShown.has(o.id))
+        .filter((o) => ['ready', 'in_locker'].includes(o.status) && !before.has(o.id) && !readyShown.has(o.id))
         .forEach((o) => {
           readyShown.add(o.id);
           toast(`🔔 Заказ ${o.number} готов к выдаче`, 'ok');

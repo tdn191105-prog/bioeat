@@ -5,14 +5,12 @@ import { repeatOrder } from './orders.js';
 import { esc, money, toast, go, dateLabel, dateTime, confirmSheet } from '../ui.js';
 import { itemThumb } from '../components.js';
 
-const STEPS = [
-  { key: 'paid', title: 'Оплачен', icon: '✓' },
-  { key: 'accepted', title: 'Принят кухней', icon: '👨‍🍳' },
-  { key: 'cooking', title: 'Комплектуется', icon: '🍳' },
-  { key: 'ready', title: 'Готов к выдаче', icon: '🔔' },
-  { key: 'issued', title: 'Выдан', icon: '🎉' },
-];
-const ORDER_FLOW = STEPS.map((s) => s.key);
+/* Шаги «принят» и «комплектуется» у кухни необязательны, поэтому для студента
+   они сведены в один: «Кухня собирает». Для постамата третий шаг — ячейка. */
+const STEP_OF = { paid: 0, accepted: 1, cooking: 1, ready: 2, in_locker: 2, issued: 3 };
+const isLocker = (order) => order.status === 'in_locker' || !!order.cell_number;
+const lockerText = (order) =>
+  `Заказ в ячейке №${order.cell_number}${order.locker_name ? `, ${order.locker_name}` : ''}`;
 
 export default async function orderView(ctx) {
   const orderId = Number(ctx.params.id);
@@ -24,18 +22,20 @@ export default async function orderView(ctx) {
     return { title: 'Заказ', html: '', mount: () => go('#/orders') };
   }
 
-  const showQr = ['paid', 'accepted', 'cooking', 'ready'].includes(order.status);
-
   const trackerHtml = (current) => {
-    const index = ORDER_FLOW.indexOf(current);
-    return STEPS.map((step, i) => {
-      const done = index > i;
-      const isCurrent = index === i;
-      const stamp =
-        step.key === 'paid' ? order.paid_at
-        : step.key === 'ready' ? order.ready_at
-        : step.key === 'issued' ? order.issued_at
-        : null;
+    const index = STEP_OF[current] ?? -1;
+    const steps = [
+      { title: 'Оплачен', icon: '✓', stamp: order.paid_at },
+      { title: 'Кухня собирает', icon: '👨‍🍳', stamp: null },
+      isLocker(order)
+        ? { title: order.cell_number ? `В ячейке №${order.cell_number}` : 'В ячейке постамата', icon: '📦', stamp: order.placed_at }
+        : { title: 'Готов к выдаче', icon: '🔔', stamp: order.ready_at },
+      { title: 'Выдан', icon: '🎉', stamp: order.issued_at || order.picked_up_at },
+    ];
+    return steps.map((step, i) => {
+      const done = index > i || current === 'issued';
+      const isCurrent = index === i && current !== 'issued';
+      const { stamp } = step;
       return `
         <div class="track-step ${done ? 'is-done' : ''} ${isCurrent ? 'is-current' : ''}">
           <div class="track-dot">${done ? '✓' : step.icon}</div>
@@ -60,6 +60,7 @@ export default async function orderView(ctx) {
         // правило отмены считает сервер: до отсечки перемены — сам, после — через оператора
         const cancellable = order.can_cancel;
         const lockedByDeadline = ['paid', 'accepted'].includes(order.status) && !order.can_cancel;
+        const showQr = ['paid', 'accepted', 'cooking', 'ready', 'in_locker'].includes(order.status);
         body.innerHTML = `
           ${
             order.status === 'cancelled'
@@ -88,7 +89,9 @@ export default async function orderView(ctx) {
                    <div class="small muted">${esc(order.pickup_point)}</div>
                    <div class="mt-16">
                      ${
-                       order.status === 'ready'
+                       order.status === 'in_locker'
+                         ? `<span class="status-pill status-pill--in_locker">📦 ${esc(lockerText(order))}</span>`
+                         : order.status === 'ready'
                          ? '<span class="status-pill status-pill--ready">🔔 Заказ готов — можно забирать</span>'
                          : `<span class="status-pill status-pill--${esc(order.status)}">${esc(order.status_label)}</span>`
                      }

@@ -1451,3 +1451,75 @@ table.data tbody tr:hover { background: rgba(255, 255, 255, 0.025); }
 }
 .slot-deadline--soon { color: var(--orange); }
 .slot-deadline--closed { color: var(--text-3); }
+
+/* --------------------------------------------------------------------------
+ *  Кабинет столовой: перемены
+ * -------------------------------------------------------------------------- */
+.status-pill--in_locker { background: rgba(123, 92, 240, .22); color: #b9a6ff; }
+.ticket--in_locker { border-color: rgba(123, 92, 240, .45); }
+
+.shift-slot { padding: 0; overflow: hidden; }
+.shift-slot--current { box-shadow: inset 0 0 0 1.5px var(--accent); }
+.shift-slot__head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  text-align: left;
+  min-height: 64px;
+}
+.shift-slot__time {
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: -0.5px;
+  min-width: 64px;
+  font-variant-numeric: tabular-nums;
+}
+.shift-slot__title { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.shift-slot__side { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.shift-slot__now {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-left: 6px;
+}
+.shift-slot__body { padding: 0 18px 18px; display: flex; flex-direction: column; gap: 12px; }
+.shift-slot__label { text-transform: uppercase; letter-spacing: .6px; }
+.shift-slot__tools { gap: 8px; flex-wrap: wrap; }
+.shift-slot__orders { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+
+.collect { display: flex; flex-wrap: wrap; gap: 8px; }
+.collect__item {
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: var(--surface-2);
+  font-size: 14px;
+}
+.collect__item b { color: var(--green); margin-left: 2px; }
+
+.print-sheet { display: none; }
+
+@media (max-width: 560px) {
+  .shift-slot__head { flex-wrap: wrap; }
+  .shift-slot__side { width: 100%; justify-content: flex-start; }
+}
+
+/* Печать листа сборки: только выбранная перемена, без кнопок и навигации */
+@media print {
+  @page { margin: 14mm; }
+  html, body { background: #fff !important; color: #000 !important; }
+  .rail, .topbar, .tabbar, .action-bar, .no-print, .toast-host, .sheet-host { display: none !important; }
+  .shell { max-width: none !important; }
+  .content { padding: 0 !important; }
+  body.printing-slot .shift-slot:not(.print-target) { display: none !important; }
+  body.printing-slot .print-target > .shift-slot__head,
+  body.printing-slot .print-target .shift-slot__body > :not(.print-sheet) { display: none !important; }
+  .print-sheet { display: block; color: #000; font-size: 12pt; }
+  .print-sheet h2 { font-size: 16pt; margin: 0 0 4pt; }
+  .print-sheet h3 { font-size: 13pt; margin: 12pt 0 4pt; }
+  .print-sheet table { width: 100%; border-collapse: collapse; }
+  .print-sheet td { border-bottom: 1px solid #999; padding: 4pt 6pt; vertical-align: top; }
+  .section { background: none !important; box-shadow: none !important; }
+}

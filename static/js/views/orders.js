@@ -72,7 +72,7 @@ export default async function ordersView() {
               ${
                 order.status === 'created'
                   ? '<span class="status-pill status-pill--created">Оплатить →</span>'
-                  : order.status === 'ready'
+                  : ['ready', 'in_locker'].includes(order.status)
                     ? '<span class="status-pill status-pill--ready">Показать QR →</span>'
                     : '<span class="small muted">Подробнее →</span>'
               }

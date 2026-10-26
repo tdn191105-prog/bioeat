@@ -57,8 +57,8 @@ export default async function profileView() {
               isStaff()
                 ? `<button class="option" data-goto="#/operator">
                      <span class="option__ico">👨‍🍳</span>
-                     <span class="option__body"><span class="option__title">Экран оператора</span>
-                     <span class="option__sub">Очередь заказов и выдача по QR</span></span>
+                     <span class="option__body"><span class="option__title">Кабинет столовой</span>
+                     <span class="option__sub">Заказы по переменам, сборка и выдача</span></span>
                      <span class="option__right">→</span>
                    </button>`
                 : ''

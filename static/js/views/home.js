@@ -27,7 +27,7 @@ function bannersHtml() {
   const banners = [];
 
   if (order) {
-    const ready = order.status === 'ready';
+    const ready = ['ready', 'in_locker'].includes(order.status);
     banners.push(`
       <button class="banner ${ready ? 'banner--green' : ''}" data-goto="#/order/${order.id}">
         <span class="banner__pill">${ready ? 'Готов к выдаче' : esc(order.status_label)}</span>
@@ -111,7 +111,7 @@ function tilesHtml() {
   if (isStaff()) {
     tiles.push({
       href: '#/operator',
-      title: 'Экран оператора',
+      title: 'Кабинет столовой',
       emoji: '👨‍🍳',
       bg: 'linear-gradient(140deg,#d9641f,#f0913c)',
     });
@@ -219,7 +219,7 @@ export default async function homeView() {
           <div class="stat__label">${order ? 'Текущий заказ' : 'Заказ на сегодня'}</div>
           <div class="stat__icon">${order ? '🍱' : '⏱'}</div>
           <div>
-            <div class="stat__value ${order && order.status === 'ready' ? 'stat__value--green' : ''}">
+            <div class="stat__value ${order && ['ready', 'in_locker'].includes(order.status) ? 'stat__value--green' : ''}">
               ${order ? esc(order.number) : '—'}
             </div>
             <div class="stat__sub">${order ? esc(order.status_label) : 'Ещё не оформлен'}</div>

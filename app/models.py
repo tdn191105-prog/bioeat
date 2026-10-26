@@ -43,7 +43,8 @@ class OrderStatus(str, enum.Enum):
     paid = "paid"             # оплачен, ждёт подтверждения кухней
     accepted = "accepted"     # кухня приняла
     cooking = "cooking"       # комплектуется
-    ready = "ready"           # готов к выдаче (push «Заказ готов»)
+    ready = "ready"           # собран, готов к выдаче (push «Заказ готов»)
+    in_locker = "in_locker"   # положен в ячейку постамата, ждёт студента
     issued = "issued"         # выдан студенту
     cancelled = "cancelled"   # отменён (остатки возвращены)
 
@@ -66,7 +67,11 @@ ACTIVE_STATUSES = (
     OrderStatus.accepted,
     OrderStatus.cooking,
     OrderStatus.ready,
+    OrderStatus.in_locker,
 )
+
+# ещё не собраны — их кухня собирает после отсечки перемены
+TO_COLLECT_STATUSES = (OrderStatus.paid, OrderStatus.accepted, OrderStatus.cooking)
 
 
 # --------------------------------------------------------------------------- #

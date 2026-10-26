@@ -429,6 +429,7 @@ async def stats(
         OrderStatus.accepted,
         OrderStatus.cooking,
         OrderStatus.ready,
+        OrderStatus.in_locker,
         OrderStatus.issued,
     ]
 

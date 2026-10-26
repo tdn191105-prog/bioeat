@@ -16,8 +16,10 @@ from ..services import (
     ALLOWED_TRANSITIONS,
     campus_today,
     cancel_order,
+    mark_slot_collected,
     order_number_candidates,
     order_payload,
+    shift_payload,
 )
 
 router = APIRouter(prefix="/api/operator", tags=["operator"], dependencies=[Depends(staff_required)])
@@ -46,6 +48,26 @@ async def queue(
     stmt = stmt.order_by(Order.created_at)
     orders = (await session.scalars(stmt)).all()
     return [order_payload(o, with_customer=True) for o in orders]
+
+
+@router.get("/shift")
+async def shift(
+    on_date: date | None = Query(default=None, alias="date"),
+    session: AsyncSession = Depends(get_session),
+):
+    """Экран кухни: перемены дня со сводкой «что собрать» и заказами."""
+    return await shift_payload(session, on_date or campus_today())
+
+
+@router.post("/shift/{slot_id}/collected")
+async def shift_collected(
+    slot_id: int,
+    on_date: date | None = Query(default=None, alias="date"),
+    session: AsyncSession = Depends(get_session),
+):
+    """«Отметить всё как собранное» по перемене — одним действием."""
+    count = await mark_slot_collected(session, slot_id, on_date or campus_today())
+    return {"ok": True, "updated": count}
 
 
 @router.get("/board")
@@ -92,6 +114,11 @@ async def change_status(
         order = await cancel_order(session, order)
         return order_payload(order, with_customer=True)
 
+    if data.status == OrderStatus.in_locker:
+        raise HTTPException(
+            status_code=409,
+            detail="В ячейку заказ кладётся через «Положен в ячейку» — там назначается номер ячейки",
+        )
     if data.status not in ALLOWED_TRANSITIONS.get(order.status, set()):
         raise HTTPException(
             status_code=409,
