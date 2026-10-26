@@ -16,7 +16,8 @@ from fastapi.staticfiles import StaticFiles
 
 from .config import settings
 from .db import SessionLocal, create_all, engine, ensure_columns
-from .routers import admin, auth, cart, locker_device, menu, operator, orders, reviews
+from .payments import get_provider
+from .routers import admin, auth, cart, locker_device, menu, operator, orders, payments, reviews
 from .seed import seed
 from .services import expire_unpaid_orders
 
@@ -69,6 +70,12 @@ async def lifespan(app: FastAPI):
         result = await seed(session)
     log.info("РосПит запущен. Seed: %s", result)
 
+    provider = get_provider()
+    if not provider.configured:
+        log.warning("Платёжный провайдер «%s» не настроен — оплата будет отвечать 503", provider.name)
+    else:
+        log.info("Платёжный провайдер: %s", provider.name)
+
     sweeper = asyncio.create_task(_expire_unpaid_loop())
     yield
     sweeper.cancel()
@@ -82,7 +89,7 @@ app = FastAPI(
     title="РосПит API",
     description=(
         "Предзаказ питания в столовой РОСБИОТЕХ. "
-        "Платежи работают в демонстрационном режиме и не обращаются к реальным системам."
+        "Платёжный провайдер задаётся PAYMENT_PROVIDER (demo — без обращения к банкам)."
     ),
     version="1.1.0",
     lifespan=lifespan,
@@ -119,12 +126,18 @@ app.include_router(operator.router)
 app.include_router(admin.router)
 app.include_router(locker_device.router)
 app.include_router(reviews.router)
+app.include_router(payments.router)
 app.include_router(reviews.staff_router)
 
 
 @app.get("/api/health")
 async def health():
-    return {"status": "ok", "app": settings.app_name, "demo_payments": settings.demo_payments}
+    return {
+        "status": "ok",
+        "app": settings.app_name,
+        "payment_provider": settings.active_payment_provider,
+        "demo_payments": settings.is_demo_payments,
+    }
 
 
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")

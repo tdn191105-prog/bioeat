@@ -1562,3 +1562,15 @@ table.data tbody tr:hover { background: rgba(255, 255, 255, 0.025); }
 .rate-row { display: flex; align-items: center; gap: 4px; margin-top: 10px; }
 .rate-row button { font-size: 26px; color: var(--surface-3); width: 44px; height: 44px; }
 .rate-row button:hover { color: var(--yellow); }
+
+/* Ожидание подтверждения банка */
+.spinner {
+  width: 42px; height: 42px;
+  margin: 4px auto 0;
+  border-radius: 50%;
+  border: 4px solid var(--surface-3);
+  border-top-color: var(--accent);
+  animation: spin .9s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 3s; } }

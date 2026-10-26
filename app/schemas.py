@@ -269,15 +269,26 @@ class OrderOut(BaseModel):
 
 class PayIn(BaseModel):
     method: PaymentMethod = PaymentMethod.sbp
-    # в демо-режиме можно смоделировать отказ банка
+    # смоделировать отказ банка можно только в демо-режиме; в боевом флаг игнорируется
     simulate_failure: bool = False
 
 
 class PayOut(BaseModel):
     ok: bool
+    status: str = "succeeded"          # succeeded | pending | failed
     message: str
     order: OrderOut | None = None
     provider_ref: str | None = None
+    # куда отправить студента: страница банка (карта, 3-D Secure) или выбор банка СБП
+    confirmation_url: str = ""
+
+
+class PaymentStatusOut(BaseModel):
+    state: str                          # not_started | pending | paid | failed | expired | cancelled
+    order_status: OrderStatus
+    message: str = ""
+    confirmation_url: str = ""
+    refund_status: str = ""
 
 
 # ------------------------------- Оператор ----------------------------------- #

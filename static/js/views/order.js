@@ -125,7 +125,7 @@ export default async function orderView(ctx) {
                    </div>
                  </section>`
               : order.status === 'created'
-                ? `<section class="section center">
+                ? `<section class="section center" id="pay-state">
                      <div style="font-size:46px">⏳</div>
                      <div class="bold mt-8">Заказ ждёт оплаты</div>
                      <div class="small muted">QR-код появится сразу после оплаты</div>
@@ -226,6 +226,59 @@ export default async function orderView(ctx) {
         mountReview();
       };
 
+      /* Возврат из банка (?payment=return): источник истины — сервер, который
+         перезапрашивает статус у провайдера. Ждём подтверждения до трёх минут. */
+      let payPolls = 0;
+      let payTimer = null;
+      const payState = (html) => {
+        const host = body.querySelector('#pay-state');
+        if (host) host.innerHTML = html;
+      };
+      const checkPayment = async () => {
+        clearTimeout(payTimer);
+        if (!document.body.contains(body) || order.status !== 'created') return;
+        let st;
+        try {
+          st = await api.get(`/api/orders/${order.id}/payment-status`, { silent: true });
+        } catch {
+          payTimer = setTimeout(checkPayment, 4000);
+          return;
+        }
+        if (st.state === 'paid') {
+          order = await api.get(`/api/orders/${order.id}`);
+          toast('Оплата прошла', 'ok');
+          await loadActiveOrders().catch(() => []);
+          render();
+          return;
+        }
+        if (st.state === 'expired' || st.state === 'cancelled') {
+          order = await api.get(`/api/orders/${order.id}`);
+          render();
+          return;
+        }
+        if (st.state === 'failed') {
+          payState(`<div style="font-size:46px">⚠️</div>
+            <div class="bold mt-8">Оплата не прошла</div>
+            <div class="small muted">Банк отклонил платёж или он был отменён. Деньги не списаны.</div>
+            <button class="btn mt-16" data-goto="#/pay/${order.id}">Попробовать снова</button>`);
+          body.querySelector('#pay-state [data-goto]').onclick = () => go(`#/pay/${order.id}`);
+          return;
+        }
+        payPolls += 1;
+        payState(`<div class="spinner" aria-hidden="true"></div>
+          <div class="bold mt-8">Ждём подтверждения банка…</div>
+          <div class="small muted">Обычно это занимает несколько секунд. Не закрывайте приложение.</div>
+          ${st.confirmation_url ? `<a class="btn btn--ghost mt-16" href="${esc(st.confirmation_url)}">Вернуться к оплате</a>` : ''}`);
+        if (payPolls < 90) payTimer = setTimeout(checkPayment, 2000);
+      };
+      // вернулись из банковского приложения (СБП) — сразу проверяем статус
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible' && order.status === 'created' && document.body.contains(body)) {
+          payPolls = 0;
+          checkPayment();
+        }
+      });
+
       /* Отзыв после выдачи: форма или уже оставленный отзыв (править можно 24 часа). */
       const presetRating = Number(ctx.query?.get('rate')) || 0;
       const mountReview = async (forceEdit = false) => {
@@ -294,6 +347,7 @@ export default async function orderView(ctx) {
       };
 
       render();
+      if (ctx.query?.get('payment') === 'return' && order.status === 'created') checkPayment();
 
       // мягкий поллинг статуса, пока заказ активен — имитирует push-уведомление
       let previous = order.status;

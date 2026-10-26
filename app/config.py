@@ -16,8 +16,25 @@ class Settings(BaseSettings):
     tz_offset_hours: int = 3
     # Комиссия/бонусы
     loyalty_percent: int = 5  # % кэшбэка бонусами
-    # Демо-режим: платежи не уходят в реальные системы
+    # Платёжный провайдер: demo | yookassa | cloudpayments | bank.
+    # Пусто — решает старый флаг DEMO_PAYMENTS (true → demo, false → yookassa).
+    payment_provider: str = ""
+    # Демо-режим: платежи не уходят в реальные системы (синоним PAYMENT_PROVIDER=demo)
     demo_payments: bool = True
+    # ЮKassa: секреты только из окружения
+    yookassa_shop_id: str = ""
+    yookassa_secret_key: str = ""
+    yookassa_api_url: str = "https://api.yookassa.ru/v3"
+    # проверять, что вебхук пришёл с адресов ЮKassa (за прокси нужен --proxy-headers)
+    yookassa_check_ip: bool = True
+    # Публичный адрес приложения — сюда банк вернёт студента после оплаты
+    public_base_url: str = ""
+    # Чек 54-ФЗ через провайдера: ставка НДС (код ЮKassa: 1 — без НДС, 11 — 22 %),
+    # признак предмета расчёта. Значения подтверждает бухгалтерия столовой.
+    receipt_enabled: bool = True
+    receipt_vat_code: int = 1
+    receipt_payment_subject: str = "commodity"
+    receipt_tax_system_code: int | None = None
     # За сколько минут до начала перемены закрывается приём заказов (значение
     # для новых окон; у каждого окна своё поле order_cutoff_minutes)
     default_order_cutoff_minutes: int = 60
@@ -32,6 +49,16 @@ class Settings(BaseSettings):
     device_clock_skew_seconds: int = 30
     pin_attempts_per_5min: int = 5
     cors_origins: str = "*"
+
+    @property
+    def active_payment_provider(self) -> str:
+        if self.payment_provider:
+            return self.payment_provider.strip().lower()
+        return "demo" if self.demo_payments else "yookassa"
+
+    @property
+    def is_demo_payments(self) -> bool:
+        return self.active_payment_provider == "demo"
 
     @property
     def is_sqlite(self) -> bool:

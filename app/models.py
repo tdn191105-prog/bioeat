@@ -290,8 +290,19 @@ class Payment(Base):
     status: Mapped[PaymentStatus] = mapped_column(
         Enum(PaymentStatus, native_enum=False, length=20), default=PaymentStatus.pending
     )
-    provider_ref: Mapped[str] = mapped_column(String(64), default="")  # id «транзакции» в моке
+    provider_ref: Mapped[str] = mapped_column(String(64), default="")  # id платежа у провайдера
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    # --- реальный эквайринг ------------------------------------------------ #
+    provider: Mapped[str] = mapped_column(String(20), default="demo")    # demo | yookassa | …
+    idempotence_key: Mapped[str] = mapped_column(String(64), default="")
+    confirmation_url: Mapped[str] = mapped_column(String(500), default="")
+    failure_reason: Mapped[str] = mapped_column(String(120), default="")
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # возврат: provider.refund(), а не просто смена статуса в базе
+    refund_ref: Mapped[str] = mapped_column(String(64), default="")
+    refund_status: Mapped[str] = mapped_column(String(20), default="")   # pending | succeeded | failed
+    refund_reason: Mapped[str] = mapped_column(String(40), default="")
+    refunded_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     order: Mapped[Order] = relationship(back_populates="payments")
 

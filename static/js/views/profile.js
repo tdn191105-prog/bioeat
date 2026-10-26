@@ -1,4 +1,5 @@
 /* Профиль пользователя. */
+import api from '../api.js';
 import { state, logout, isStaff, isAdmin } from '../state.js';
 import { esc, money, go, toast, confirmSheet, openSheet, closeSheet } from '../ui.js';
 import { mountReviewForm } from '../components.js';
@@ -98,7 +99,7 @@ export default async function profileView() {
             <div class="bold" style="color:var(--text)">О приложении</div>
             <img src="/static/icons/logo.svg" alt="РосПит" width="148" height="28" style="margin:4px 0">
             <div>РосПит — предзаказ питания в столовой РОСБИОТЕХ. Версия 1.1.</div>
-            <div>Оплата работает в демонстрационном режиме: обращений к банковским системам и СБП не происходит.</div>
+            <div id="pay-note"></div>
           </div>
         </section>
 
@@ -109,6 +110,11 @@ export default async function profileView() {
       root.querySelectorAll('[data-goto]').forEach((el) => {
         el.onclick = () => go(el.dataset.goto);
       });
+      api.get('/api/payments/config').then((cfg) => {
+        root.querySelector('#pay-note').textContent = cfg.demo
+          ? 'Оплата работает в демонстрационном режиме: обращений к банковским системам и СБП не происходит.'
+          : 'Оплата картой и через СБП. Электронный чек приходит на почту.';
+      }).catch(() => {});
       root.querySelector('[data-feedback]').onclick = () => {
         openSheet(
           `<div class="stack">

@@ -111,7 +111,7 @@ function renderNav(path) {
     <div class="rail__foot">
       <div class="small muted" style="padding:0 12px 10px">
         ${state.user ? esc(state.user.full_name) : 'Гость'}<br>
-        <span style="color:var(--text-3)">Демо-режим оплаты</span>
+        <span style="color:var(--text-3)">${esc(paymentMode)}</span>
       </div>
     </div>`;
 }
@@ -242,9 +242,18 @@ window.addEventListener('hashchange', () => {
   render();
 });
 
+/* Подпись режима оплаты в боковом меню — по факту настроек сервера */
+let paymentMode = '';
+async function loadPaymentMode() {
+  try {
+    const cfg = await (await fetch('/api/payments/config')).json();
+    paymentMode = cfg.demo ? 'Демо-режим оплаты' : '';
+  } catch { paymentMode = ''; }
+}
+
 /* ------------------------------ Запуск ----------------------------------- */
 (async function boot() {
-  await loadUser();
+  await Promise.all([loadUser(), loadPaymentMode()]);
   if (state.user) {
     await Promise.all([loadCart().catch(() => {}), loadActiveOrders().catch(() => {})]);
   }

@@ -1,16 +1,17 @@
 """Заказы студента: оформление, оплата, история, QR-код."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..config import settings
 from ..db import get_session
 from ..deps import current_user
 from ..lockers import issue_pickup_token, pickup_snapshot
 from ..models import ACTIVE_STATUSES, Order, OrderStatus, User, UserRole
 from ..qr import qr_svg
-from ..schemas import OrderCreateIn, OrderOut, PayIn, PayOut, PickupTokenOut
+from ..schemas import OrderCreateIn, OrderOut, PayIn, PaymentStatusOut, PayOut, PickupTokenOut
 from ..services import (
     cancel_order,
     create_order,
@@ -21,6 +22,7 @@ from ..services import (
     order_deadline,
     order_payload,
     pay_order,
+    payment_status_payload,
     repeat_order,
 )
 
@@ -74,21 +76,35 @@ async def get_order(
     return order_payload(order, with_customer=user.role != UserRole.student)
 
 
+def _return_url(request: Request, order_id: int) -> str:
+    base = settings.public_base_url.rstrip("/") or str(request.base_url).rstrip("/")
+    return f"{base}/#/order/{order_id}?payment=return"
+
+
 @router.post("/{order_id}/pay", response_model=PayOut)
 async def pay(
     order_id: int,
     data: PayIn,
+    request: Request,
     user: User = Depends(current_user),
     session: AsyncSession = Depends(get_session),
 ):
     order = await _load_order(session, order_id, user)
-    ok, message, ref = await pay_order(session, order, data.method, data.simulate_failure)
-    return {
-        "ok": ok,
-        "message": message,
-        "order": order_payload(order) if ok else None,
-        "provider_ref": ref,
-    }
+    result = await pay_order(
+        session, order, data.method, data.simulate_failure, return_url=_return_url(request, order.id)
+    )
+    return {**result, "order": order_payload(order) if result["ok"] else None}
+
+
+@router.get("/{order_id}/payment-status", response_model=PaymentStatusOut)
+async def payment_status(
+    order_id: int,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Клиент опрашивает после возврата из банка. Статус перезапрашивается у провайдера."""
+    order = await _load_order(session, order_id, user)
+    return await payment_status_payload(session, order)
 
 
 @router.post("/{order_id}/cancel", response_model=OrderOut)

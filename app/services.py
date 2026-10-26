@@ -1,6 +1,7 @@
 """Бизнес-логика: корзина, оформление и оплата заказа."""
 from __future__ import annotations
 
+import logging
 import random
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
@@ -32,6 +33,8 @@ from .models import (
     User,
     utcnow,
 )
+from .payments import PaymentError, PaymentRequest, PaymentState, build_provider, get_provider
+from .payments.receipt import build_receipt
 from .security import make_pickup_code
 
 STATUS_LABELS = {
@@ -59,6 +62,8 @@ ALLOWED_TRANSITIONS: dict[OrderStatus, set[OrderStatus]] = {
     OrderStatus.issued: set(),
     OrderStatus.cancelled: set(),
 }
+
+log = logging.getLogger("rospit")
 
 MAX_BONUS_SHARE = Decimal("0.30")  # бонусами можно закрыть не больше 30% чека
 
@@ -507,6 +512,12 @@ async def cancel_order(
         raise HTTPException(status_code=409, detail="Заказ уже закрыт")
 
     was_paid = order.status != OrderStatus.created
+    # сначала деньги: если провайдер не принял возврат, заказ не отменяем —
+    # иначе студент останется и без заказа, и без денег
+    if refund:
+        for payment in order.payments:
+            if payment.status == PaymentStatus.succeeded and payment.refund_status != "succeeded":
+                await refund_payment(session, order, payment, reason=reason or "cancelled")
     if order.status == OrderStatus.in_locker:
         # заказ лежит в ячейке: освобождаем её и открываем дверцу, чтобы забрать
         await release_cell(session, order, open_reason="unload")
@@ -523,17 +534,16 @@ async def cancel_order(
             balance = max(Decimal("0.00"), balance - money(order.bonus_earned))
         user.bonus_balance = money(balance)
 
-    if order.status != OrderStatus.created and refund:
-        for payment in order.payments:
-            if payment.status == PaymentStatus.succeeded:
-                payment.status = PaymentStatus.refunded
-
     order.status = OrderStatus.cancelled
     order.cancelled_at = utcnow()
     order.cancel_reason = reason
     await session.commit()
     await session.refresh(order, ["items", "payments", "user"])
     return order
+
+
+def _has_pending_payment(order: Order) -> bool:
+    return any(p.status == PaymentStatus.pending and p.provider != "demo" for p in order.payments)
 
 
 def unpaid_is_stale(order: Order, now_utc: datetime | None = None) -> bool:
@@ -548,6 +558,11 @@ def unpaid_is_stale(order: Order, now_utc: datetime | None = None) -> bool:
 async def expire_order_if_stale(session: AsyncSession, order: Order) -> bool:
     if not unpaid_is_stale(order):
         return False
+    if _has_pending_payment(order):
+        # деньги могли уже прийти, а вебхук — задержаться: сначала спросим банк
+        await refresh_pending_payments(session, order)
+        if order.status != OrderStatus.created:
+            return order.status == OrderStatus.cancelled
     reason = "deadline" if is_past_deadline(order) else "expired"
     await cancel_order(session, order, reason=reason)
     return True
@@ -565,9 +580,7 @@ async def expire_unpaid_orders(session: AsyncSession) -> int:
     expired = 0
     now_utc = utcnow()
     for order in created:
-        if unpaid_is_stale(order, now_utc):
-            reason = "deadline" if is_past_deadline(order) else "expired"
-            await cancel_order(session, order, reason=reason)
+        if unpaid_is_stale(order, now_utc) and await expire_order_if_stale(session, order):
             expired += 1
     return expired
 
@@ -591,57 +604,228 @@ def cancelled_message(order: Order) -> str:
 # --------------------------------------------------------------------------- #
 #  Оплата (демо-режим)
 # --------------------------------------------------------------------------- #
+def _pretty_amount(amount: Decimal) -> str:
+    pretty = f"{money(amount):.2f}"
+    return pretty[:-3] if pretty.endswith(".00") else pretty  # целые суммы без копеек
+
+
+METHOD_LABELS = {PaymentMethod.sbp: "СБП", PaymentMethod.card: "картой", PaymentMethod.bonus: "бонусами"}
+
+
 async def pay_order(
     session: AsyncSession,
     order: Order,
     method: PaymentMethod,
     simulate_failure: bool = False,
-) -> tuple[bool, str, str]:
-    """Имитация эквайринга. Реальные системы не подключаются.
+    return_url: str = "",
+) -> dict:
+    """Создаёт платёж у провайдера (PAYMENT_PROVIDER).
 
-    Возвращает (успех, сообщение, номер транзакции).
+    Демо-провайдер отвечает сразу. Реальный — возвращает confirmation_url:
+    клиент уходит на страницу банка (карта, 3-D Secure) или в банковское
+    приложение (СБП), а заказ станет «Оплачен» только по подтверждённому
+    статусу — из вебхука или перезапроса статуса у провайдера.
     """
+    provider = get_provider()
     if order.status == OrderStatus.cancelled:
         raise HTTPException(status_code=409, detail=cancelled_message(order))
     if order.status != OrderStatus.created:
         # идемпотентность: повторный запрос не списывает второй раз
-        return True, "Заказ уже оплачен", ""
+        return {"ok": True, "status": "succeeded", "message": "Заказ уже оплачен", "provider_ref": ""}
     # отсечку и срок оплаты проверяем до списания: открыл оплату в 10:59,
     # нажал «Оплатить» в 11:02 — деньги не списываются
     if await expire_order_if_stale(session, order):
         raise HTTPException(status_code=409, detail=cancelled_message(order))
+    if not provider.configured:
+        raise HTTPException(status_code=503, detail="Онлайн-оплата временно недоступна: провайдер не настроен")
+    # отказ банка можно смоделировать только в демо-режиме
+    simulate_failure = simulate_failure and provider.name == "demo"
 
-    provider_ref = f"DEMO-{random.randint(100000, 999999)}"
     payment = Payment(
         order_id=order.id,
         method=method,
         amount=money(order.total),
         status=PaymentStatus.pending,
-        provider_ref=provider_ref,
+        provider=provider.name,
     )
     session.add(payment)
+    await session.flush()
+    payment.idempotence_key = f"rospit-pay-{payment.id}"
 
-    if simulate_failure:
+    receipt = None
+    if settings.receipt_enabled and provider.name != "demo":
+        receipt = build_receipt(order, order.user.email)
+    try:
+        created = await provider.create_payment(
+            PaymentRequest(
+                payment_id=payment.id,
+                order_id=order.id,
+                order_number=order.number,
+                amount=money(order.total),
+                method=method.value,
+                return_url=return_url,
+                description=f"Заказ {order.number} в столовой РОСБИОТЕХ",
+                receipt=receipt,
+                simulate_failure=simulate_failure,
+            )
+        )
+    except PaymentError as exc:
         payment.status = PaymentStatus.failed
+        payment.failure_reason = str(exc)[:120]
         await session.commit()
-        return False, "Банк отклонил операцию. Попробуйте другой способ оплаты.", provider_ref
+        raise HTTPException(status_code=502, detail="Банк сейчас недоступен. Попробуйте ещё раз через минуту.") from exc
 
-    payment.status = PaymentStatus.succeeded
+    payment.provider_ref = created.provider_ref
+    payment.confirmation_url = created.confirmation_url
+    payment.updated_at = utcnow()
+    if created.status == "succeeded":
+        await apply_payment_state(
+            session, payment, PaymentState(created.provider_ref, "succeeded", money(order.total),
+                                           metadata={"order_id": str(order.id)})
+        )
+    elif created.status == "canceled":
+        payment.status = PaymentStatus.failed
+        payment.failure_reason = created.failure_reason
+    await session.commit()
+    await session.refresh(order, ["items", "payments", "user"])
+
+    if payment.status == PaymentStatus.succeeded:
+        message = f"Оплачено {METHOD_LABELS.get(method, '')} — {_pretty_amount(order.total)} ₽"
+        return {"ok": True, "status": "succeeded", "message": message, "provider_ref": payment.provider_ref}
+    if payment.status == PaymentStatus.failed:
+        return {"ok": False, "status": "failed", "provider_ref": payment.provider_ref,
+                "message": "Банк отклонил операцию. Попробуйте другой способ оплаты."}
+    return {
+        "ok": False,
+        "status": "pending",
+        "provider_ref": payment.provider_ref,
+        "confirmation_url": payment.confirmation_url,
+        "message": "Подтвердите оплату в банке",
+    }
+
+
+async def mark_order_paid(session: AsyncSession, order: Order) -> None:
     order.status = OrderStatus.paid
     order.paid_at = utcnow()
-
     user = await session.get(User, order.user_id)
     if user and order.bonus_earned:
         user.bonus_balance = money(money(user.bonus_balance) + money(order.bonus_earned))
 
+
+async def refund_payment(session: AsyncSession, order: Order, payment: Payment, reason: str) -> None:
+    """Возврат через провайдера. Статус возврата хранится в платеже."""
+    if payment.refund_status in ("pending", "succeeded"):
+        return
+    provider = get_provider() if payment.provider == get_provider().name else build_provider(payment.provider)
+    receipt = None
+    if settings.receipt_enabled and provider.name != "demo" and order.user is not None:
+        receipt = build_receipt(order, order.user.email, total=payment.amount)
+    try:
+        result = await provider.refund(
+            payment.provider_ref, money(payment.amount), receipt, idempotence_key=f"rospit-refund-{payment.id}"
+        )
+    except PaymentError as exc:
+        payment.refund_status = "failed"
+        payment.refund_reason = reason[:40]
+        await session.commit()
+        raise HTTPException(
+            status_code=502, detail="Не удалось оформить возврат в банке. Попробуйте позже или обратитесь в столовую."
+        ) from exc
+    payment.refund_ref = result.refund_ref
+    payment.refund_status = "succeeded" if result.status == "succeeded" else "pending"
+    payment.refund_reason = reason[:40]
+    payment.refunded_at = utcnow()
+    payment.status = PaymentStatus.refunded
+    payment.updated_at = utcnow()
+
+
+async def apply_payment_state(session: AsyncSession, payment: Payment, state: PaymentState) -> str:
+    """Применяет подтверждённый провайдером статус. Идемпотентно.
+
+    Источник истины — статус, перезапрошенный у провайдера, а не тело вебхука.
+    Сумма и заказ сверяются; оплата пришла к отменённому, просроченному или уже
+    оплаченному заказу — деньги автоматически возвращаются.
+    """
+    order = await session.get(Order, payment.order_id)
+    if order is None:
+        return "no_order"
+    payment.updated_at = utcnow()
+
+    if state.status == "succeeded":
+        if payment.status in (PaymentStatus.succeeded, PaymentStatus.refunded):
+            return "duplicate"
+        payment.status = PaymentStatus.succeeded
+        meta_order = str(state.metadata.get("order_id", order.id))
+        if money(state.amount) != money(payment.amount) or meta_order != str(order.id):
+            log.warning("Платёж %s: сумма/заказ не совпали (%s ≠ %s) — возврат",
+                        payment.provider_ref, state.amount, payment.amount)
+            payment.failure_reason = "amount_mismatch"
+            await refund_payment(session, order, payment, reason="amount_mismatch")
+            return "mismatch_refunded"
+        if order.status == OrderStatus.created and not is_past_deadline(order):
+            await mark_order_paid(session, order)
+            return "paid"
+        if order.status == OrderStatus.created:
+            # заплатил после отсечки: заказ отменяется, деньги возвращаются
+            await cancel_order(session, order, reason="deadline")
+            return "late_refunded"
+        reason = "duplicate_payment" if order.status != OrderStatus.cancelled else "order_cancelled"
+        await refund_payment(session, order, payment, reason=reason)
+        return "refunded"
+
+    if state.status == "canceled" and payment.status == PaymentStatus.pending:
+        payment.status = PaymentStatus.failed
+        payment.failure_reason = state.failure_reason[:120]
+        return "failed"
+    return "pending"
+
+
+async def refresh_pending_payments(session: AsyncSession, order: Order) -> None:
+    """Перезапрашивает у провайдера незавершённые платежи заказа.
+
+    Нужен, когда вебхук задерживается (или недоступен на стенде разработчика).
+    Это так же безопасно, как вебхук: статус берётся из API провайдера.
+    """
+    pending = [
+        p for p in order.payments
+        if p.status == PaymentStatus.pending and p.provider_ref and p.provider != "demo"
+    ]
+    if not pending:
+        return
+    provider = get_provider()
+    for payment in pending:
+        try:
+            state = await provider.get_status(payment.provider_ref)
+        except PaymentError as exc:
+            log.warning("Статус платежа %s не получен: %s", payment.provider_ref, exc)
+            continue
+        await apply_payment_state(session, payment, state)
     await session.commit()
-    await session.refresh(order, ["items", "payments", "user"])
-    label = {PaymentMethod.sbp: "СБП", PaymentMethod.card: "картой", PaymentMethod.bonus: "бонусами"}
-    amount = money(order.total)
-    pretty = f"{amount:.2f}"
-    if pretty.endswith(".00"):  # целые суммы показываем без копеек
-        pretty = pretty[:-3]
-    return True, f"Оплачено {label.get(method, '')} — {pretty} ₽", provider_ref
+
+
+async def payment_status_payload(session: AsyncSession, order: Order) -> dict:
+    await refresh_pending_payments(session, order)
+    await session.refresh(order, ["payments"])
+    if order.status == OrderStatus.created:
+        await expire_order_if_stale(session, order)
+    last = max(order.payments, key=lambda p: p.id, default=None)
+    if order.status == OrderStatus.cancelled:
+        state = "expired" if order.cancel_reason in ("expired", "deadline") else "cancelled"
+    elif order.status != OrderStatus.created:
+        state = "paid"
+    elif last is None:
+        state = "not_started"
+    elif last.status == PaymentStatus.failed:
+        state = "failed"
+    else:
+        state = "pending"
+    return {
+        "state": state,
+        "order_status": order.status,
+        "message": cancelled_message(order) if order.status == OrderStatus.cancelled else "",
+        "confirmation_url": last.confirmation_url if last and state == "pending" else "",
+        "refund_status": last.refund_status if last else "",
+    }
 
 
 # --------------------------------------------------------------------------- #
