@@ -21,6 +21,7 @@ def _set_cookie(response: Response, token: str) -> None:
         token,
         httponly=True,
         samesite="lax",
+        secure=settings.cookie_secure,
         max_age=settings.access_token_ttl_minutes * 60,
         path="/",
     )

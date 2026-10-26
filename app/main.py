@@ -47,6 +47,11 @@ async def _expire_unpaid_loop() -> None:
 async def lifespan(app: FastAPI):
     import asyncio
 
+    if settings.is_production:
+        problems = settings.production_problems()
+        if problems:
+            raise RuntimeError("Боевой запуск остановлен: " + "; ".join(problems))
+
     # ждём готовности БД — контейнер Postgres может подниматься дольше приложения
     last_error: Exception | None = None
     for attempt in range(1, 31):
@@ -162,7 +167,7 @@ async def favicon():
     return FileResponse(STATIC_DIR / "icons" / "favicon.ico", media_type="image/x-icon")
 
 
-@app.get("/{full_path:path}", include_in_schema=False)
+@app.api_route("/{full_path:path}", methods=["GET", "HEAD"], include_in_schema=False)
 async def spa(full_path: str):
     """Все остальные адреса отдают клиент — маршрутизация на стороне приложения."""
     if full_path.startswith("api/"):

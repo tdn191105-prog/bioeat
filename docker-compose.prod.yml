@@ -1,0 +1,72 @@
+# Боевой запуск: Caddy (автоматический HTTPS Let's Encrypt) → приложение → PostgreSQL.
+#   cp deploy/.env.prod.example .env.prod  &&  заполнить
+#   docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+# Подробно — docs/deploy.md.
+#
+# Имена базы, пользователя и томов (bioeat, bioeat-pgdata) оставлены прежними
+# намеренно: переименование тома на развёрнутом стенде потеряет данные.
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: bioeat
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?задайте POSTGRES_PASSWORD}
+      POSTGRES_DB: bioeat
+    volumes:
+      - bioeat-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bioeat -d bioeat"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    # порт базы наружу не публикуется
+
+  app:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ENVIRONMENT: production
+      DATABASE_URL: postgresql+asyncpg://bioeat:${POSTGRES_PASSWORD}@db:5432/bioeat
+      SECRET_KEY: ${SECRET_KEY:?задайте SECRET_KEY (openssl rand -hex 32)}
+      CORS_ORIGINS: https://${DOMAIN:?задайте DOMAIN}
+      COOKIE_SECURE: "true"
+      PUBLIC_BASE_URL: https://${DOMAIN}
+      TZ_OFFSET_HOURS: 3
+      PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-demo}
+      YOOKASSA_SHOP_ID: ${YOOKASSA_SHOP_ID:-}
+      YOOKASSA_SECRET_KEY: ${YOOKASSA_SECRET_KEY:-}
+      RECEIPT_VAT_CODE: ${RECEIPT_VAT_CODE:-1}
+      # приложение доступно только Caddy во внутренней сети — доверяем его X-Forwarded-For
+      # (нужно для проверки IP вебхуков ЮKassa)
+      FORWARDED_ALLOW_IPS: "*"
+    volumes:
+      - bioeat-uploads:/srv/static/uploads
+    restart: unless-stopped
+    expose:
+      - "8000"
+
+  caddy:
+    image: caddy:2.8-alpine
+    depends_on:
+      - app
+    environment:
+      DOMAIN: ${DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL:?задайте ACME_EMAIL — сюда Let's Encrypt пишет об истечении сертификата}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    restart: unless-stopped
+
+volumes:
+  bioeat-pgdata:
+  bioeat-uploads:
+  caddy-data:
+  caddy-config:

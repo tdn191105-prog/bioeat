@@ -1019,7 +1019,9 @@ async def mark_slot_collected(session: AsyncSession, slot_id: int, on_date: date
         Order.status.in_(TO_COLLECT_STATUSES),
     )
     if not settings.is_sqlite:
-        stmt = stmt.with_for_update()
+        # OF orders: у заказа жадно подгружаются пользователь и окно через LEFT JOIN,
+        # а PostgreSQL не блокирует «nullable»-сторону внешнего соединения
+        stmt = stmt.with_for_update(of=Order)
     orders = (await session.scalars(stmt)).unique().all()
     stamp = utcnow()
     for order in orders:

@@ -48,7 +48,7 @@ def campus_date(offset=0) -> str:
 
 def shot(page, profile, name):
     SCREENS.mkdir(exist_ok=True)
-    page.screenshot(path=str(SCREENS / f"{profile}-{name}.jpg"), type="jpeg", quality=80, full_page=False)
+    page.screenshot(path=str(SCREENS / f"{profile}-{name}.jpg"), type="jpeg", quality=80, scale="css", full_page=False)
 
 
 def audit(page, profile, screen, findings):
@@ -280,6 +280,15 @@ def test_phone_specifics(server, pw, findings, profile):
         page.wait_for_timeout(700)
         info[f"320px {route}"] = page.evaluate("() => document.documentElement.scrollWidth - innerWidth") <= 1
     shot(page, profile, "21-narrow-320")
+
+    # экраны персонала на телефоне: повар или кассир часто работает со смартфона
+    page.set_viewport_size(size)
+    login(page, base, "operator@rosbiotech.ru")
+    for route in ("#/operator", "#/reviews"):
+        page.goto(f"{base}/{route}")
+        page.wait_for_timeout(1500)
+        info[f"staff {route}"] = page.evaluate("() => document.documentElement.scrollWidth - innerWidth") <= 1
+    login(page, base)
 
     # крупный шрифт: масштаб страницы 130 % — так работает «Масштаб текста» в Chrome на Android
     page.set_viewport_size(size)

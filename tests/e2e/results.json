@@ -1,5 +1,75 @@
 {
   "iphone": {
+    "browser": "webkit 26.5",
+    "viewport": {
+      "width": 390,
+      "height": 664
+    },
+    "steps": {
+      "login": "ok",
+      "menu": "ok",
+      "cart": "ok",
+      "checkout": "ok",
+      "pay": "ok",
+      "qr": "ok",
+      "history": "ok",
+      "review": "ok",
+      "repeat": "ok"
+    },
+    "screens": {
+      "login": {
+        "small_targets": [],
+        "horizontal_overflow": false
+      },
+      "menu": {
+        "small_targets": [],
+        "horizontal_overflow": false
+      },
+      "dish": {
+        "small_targets": [
+          "первоисточник|83x43"
+        ],
+        "horizontal_overflow": false
+      },
+      "cart": {
+        "small_targets": [],
+        "horizontal_overflow": false
+      },
+      "checkout": {
+        "small_targets": [],
+        "horizontal_overflow": false
+      },
+      "pay": {
+        "small_targets": [],
+        "horizontal_overflow": false
+      },
+      "order": {
+        "small_targets": [],
+        "horizontal_overflow": false
+      },
+      "orders": {
+        "small_targets": [],
+        "horizontal_overflow": false
+      },
+      "review": {
+        "small_targets": [],
+        "horizontal_overflow": false
+      }
+    },
+    "checkout_slots": {
+      "labels": [
+        "приём до 08:30",
+        "приём до 09:00",
+        "приём до 11:00",
+        "приём до 13:20",
+        "приём до 16:30"
+      ],
+      "closed": 0
+    },
+    "keyboard_hides_bars": true,
+    "console_errors": [
+      "Viewport argument key \"interactive-widget\" not recognized and ignored."
+    ],
     "phone_checks": {
       "landscape #/": true,
       "landscape #/menu": true,
@@ -8,12 +78,82 @@
       "320px #/checkout": true,
       "320px #/orders": true,
       "320px #/profile": true,
+      "staff #/operator": true,
+      "staff #/reviews": true,
       "text 130% /menu": true,
       "service worker": true,
       "offline shell": "не проверено в этой среде: Page.reload: WebKit encountered an internal error"
     }
   },
   "android": {
+    "browser": "chromium 151.0.7922.34",
+    "viewport": {
+      "width": 412,
+      "height": 839
+    },
+    "steps": {
+      "login": "ok",
+      "menu": "ok",
+      "cart": "ok",
+      "checkout": "ok",
+      "pay": "ok",
+      "qr": "ok",
+      "history": "ok",
+      "review": "ok",
+      "repeat": "ok"
+    },
+    "screens": {
+      "login": {
+        "small_targets": [],
+        "horizontal_overflow": false
+      },
+      "menu": {
+        "small_targets": [],
+        "horizontal_overflow": false
+      },
+      "dish": {
+        "small_targets": [
+          "первоисточник|83x43"
+        ],
+        "horizontal_overflow": false
+      },
+      "cart": {
+        "small_targets": [],
+        "horizontal_overflow": false
+      },
+      "checkout": {
+        "small_targets": [],
+        "horizontal_overflow": false
+      },
+      "pay": {
+        "small_targets": [],
+        "horizontal_overflow": false
+      },
+      "order": {
+        "small_targets": [],
+        "horizontal_overflow": false
+      },
+      "orders": {
+        "small_targets": [],
+        "horizontal_overflow": false
+      },
+      "review": {
+        "small_targets": [],
+        "horizontal_overflow": false
+      }
+    },
+    "checkout_slots": {
+      "labels": [
+        "приём до 08:30",
+        "приём до 09:00",
+        "приём до 11:00",
+        "приём до 13:20",
+        "приём до 16:30"
+      ],
+      "closed": 0
+    },
+    "keyboard_hides_bars": true,
+    "console_errors": [],
     "phone_checks": {
       "landscape #/": true,
       "landscape #/menu": true,
@@ -22,10 +162,223 @@
       "320px #/checkout": true,
       "320px #/orders": true,
       "320px #/profile": true,
+      "staff #/operator": true,
+      "staff #/reviews": true,
       "text 130% /menu": true,
       "service worker": true,
       "offline shell": true,
       "offline keeps login": true
     }
+  },
+  "tablet": {
+    "browser": "webkit 26.5",
+    "viewport": {
+      "width": 810,
+      "height": 1080
+    },
+    "steps": {
+      "login": "ok",
+      "menu": "ok",
+      "cart": "ok",
+      "checkout": "ok",
+      "pay": "ok",
+      "qr": "ok",
+      "history": "ok",
+      "review": "ok",
+      "repeat": "ok"
+    },
+    "screens": {
+      "login": {
+        "small_targets": [],
+        "horizontal_overflow": false
+      },
+      "menu": {
+        "small_targets": [],
+        "horizontal_overflow": false
+      },
+      "dish": {
+        "small_targets": [
+          "первоисточник|83x43"
+        ],
+        "horizontal_overflow": false
+      },
+      "cart": {
+        "small_targets": [],
+        "horizontal_overflow": false
+      },
+      "checkout": {
+        "small_targets": [],
+        "horizontal_overflow": false
+      },
+      "pay": {
+        "small_targets": [],
+        "horizontal_overflow": false
+      },
+      "order": {
+        "small_targets": [],
+        "horizontal_overflow": false
+      },
+      "orders": {
+        "small_targets": [],
+        "horizontal_overflow": false
+      },
+      "review": {
+        "small_targets": [],
+        "horizontal_overflow": false
+      }
+    },
+    "checkout_slots": {
+      "labels": [
+        "приём до 08:30",
+        "приём до 09:00",
+        "приём до 11:00",
+        "приём до 13:20",
+        "приём до 16:30"
+      ],
+      "closed": 0
+    },
+    "keyboard_hides_bars": true,
+    "console_errors": [
+      "Viewport argument key \"interactive-widget\" not recognized and ignored."
+    ]
+  },
+  "desktop": {
+    "browser": "chromium 151.0.7922.34",
+    "viewport": {
+      "width": 1280,
+      "height": 800
+    },
+    "steps": {
+      "login": "ok",
+      "menu": "ok",
+      "cart": "ok",
+      "checkout": "ok",
+      "pay": "ok",
+      "qr": "ok",
+      "history": "ok",
+      "review": "ok",
+      "repeat": "ok"
+    },
+    "screens": {
+      "login": {
+        "small_targets": [
+          "🏠 Главная|231x44",
+          "🍲 Меню|231x44",
+          "🛒 Корзина|231x44",
+          "🧾 Заказы|231x44",
+          "👤 Профиль|231x44"
+        ],
+        "horizontal_overflow": false
+      },
+      "menu": {
+        "small_targets": [
+          "🏠 Главная|231x44",
+          "🍲 Меню|231x44",
+          "🛒 Корзина 1|231x44",
+          "🧾 Заказы|231x44",
+          "👤 Профиль|231x44"
+        ],
+        "horizontal_overflow": false
+      },
+      "dish": {
+        "small_targets": [
+          "🏠 Главная|231x44",
+          "🍲 Меню|231x44",
+          "🛒 Корзина 1|231x44",
+          "🧾 Заказы|231x44",
+          "👤 Профиль|231x44",
+          "первоисточник|83x43"
+        ],
+        "horizontal_overflow": false
+      },
+      "cart": {
+        "small_targets": [
+          "🏠 Главная|231x44",
+          "🍲 Меню|231x44",
+          "🛒 Корзина 1|231x44",
+          "🧾 Заказы|231x44",
+          "👤 Профиль|231x44"
+        ],
+        "horizontal_overflow": false
+      },
+      "checkout": {
+        "small_targets": [
+          "🏠 Главная|231x44",
+          "🍲 Меню|231x44",
+          "🛒 Корзина 1|231x44",
+          "🧾 Заказы|231x44",
+          "👤 Профиль|231x44"
+        ],
+        "horizontal_overflow": false
+      },
+      "pay": {
+        "small_targets": [
+          "🏠 Главная|231x44",
+          "🍲 Меню|231x44",
+          "🛒 Корзина|231x44",
+          "🧾 Заказы|231x44",
+          "👤 Профиль|231x44"
+        ],
+        "horizontal_overflow": false
+      },
+      "order": {
+        "small_targets": [
+          "🏠 Главная|231x44",
+          "🍲 Меню|231x44",
+          "🛒 Корзина|231x44",
+          "🧾 Заказы|231x44",
+          "👤 Профиль|231x44"
+        ],
+        "horizontal_overflow": false
+      },
+      "orders": {
+        "small_targets": [
+          "🏠 Главная|231x44",
+          "🍲 Меню|231x44",
+          "🛒 Корзина|231x44",
+          "🧾 Заказы|231x44",
+          "👤 Профиль|231x44"
+        ],
+        "horizontal_overflow": false
+      },
+      "review": {
+        "small_targets": [
+          "🏠 Главная|231x44",
+          "🍲 Меню|231x44",
+          "🛒 Корзина|231x44",
+          "🧾 Заказы|231x44",
+          "👤 Профиль|231x44"
+        ],
+        "horizontal_overflow": false
+      },
+      "shift": {
+        "small_targets": [
+          "🏠 Главная|231x44",
+          "🍲 Меню|231x44",
+          "🛒 Корзина|231x44",
+          "🧾 Заказы|231x44",
+          "👤 Профиль|231x44",
+          "👨‍🍳 Кабинет столовой|231x44",
+          "💬 Отзывы|231x44"
+        ],
+        "horizontal_overflow": false
+      }
+    },
+    "checkout_slots": {
+      "labels": [
+        "приём до 08:30",
+        "приём до 09:00",
+        "приём до 11:00",
+        "приём до 13:20",
+        "приём до 16:30"
+      ],
+      "closed": 0
+    },
+    "console_errors": []
+  },
+  "kitchen": {
+    "kitchen": "Собран → Положен в ячейку: ok",
+    "qr_refresh": "код обновился сам; PIN был «PIN 354 560», стал «PIN 043 268»",
+    "locker": "ячейка №1 открылась, повторный скан отклонён, статус «Выдан»"
   }
 }

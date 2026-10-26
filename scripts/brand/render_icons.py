@@ -26,10 +26,13 @@ TARGETS = [
     ("icon-maskable.svg", "icon-maskable-512.png", 512),
     ("icon-maskable.svg", "icon-maskable-192.png", 192),
     # Capacitor: иконка и сплэш для мобильной обёртки (mobile/resources)
-    ("icon-maskable.svg", "../../mobile/resources/icon.png", 1024),
+    ("icon-maskable.svg", "../../mobile/resources/icon-only.png", 1024),
+    ("icon-foreground.svg", "../../mobile/resources/icon-foreground.png", 1024),
+    ("icon-background.svg", "../../mobile/resources/icon-background.png", 1024),
 ]
 
 SPLASH = ("logo.svg", "../../mobile/resources/splash.png", 2732)
+SPLASH_DARK = ("logo.svg", "../../mobile/resources/splash-dark.png", 2732)
 
 
 async def render(page, svg: pathlib.Path, size: int, *, splash: bool = False) -> bytes:
@@ -50,6 +53,29 @@ async def render(page, svg: pathlib.Path, size: int, *, splash: bool = False) ->
     })
 
 
+# (ширина, высота) в физических пикселях — популярные iPhone и iPad
+IOS_SPLASH = [
+    (1290, 2796),  # iPhone 14/15/16 Pro Max, Plus
+    (1179, 2556),  # iPhone 14/15/16 Pro, 15/16
+    (1170, 2532),  # iPhone 12/13/14
+    (1125, 2436),  # iPhone X/XS/11 Pro, 12/13 mini
+    (828, 1792),   # iPhone XR/11
+    (750, 1334),   # iPhone SE 2/3, 8
+    (1620, 2160),  # iPad 10,2"
+    (2048, 2732),  # iPad Pro 12,9"
+]
+
+
+async def render_splash(page, svg: pathlib.Path, width: int, height: int) -> bytes:
+    markup = svg.read_text(encoding="utf-8").replace("<svg ", '<svg width="100%" ', 1)
+    html = f"""<html><body style="margin:0;background:#0a0a0c;width:{width}px;height:{height}px;
+               display:grid;place-items:center"><div style="width:{int(width * 0.55)}px">{markup}</div>
+               </body></html>"""
+    await page.set_viewport_size({"width": width, "height": height})
+    await page.set_content(html)
+    return await page.screenshot(clip={"x": 0, "y": 0, "width": width, "height": height})
+
+
 async def main() -> None:
     async with async_playwright() as p:
         browser = await p.chromium.launch()
@@ -60,10 +86,17 @@ async def main() -> None:
             out.write_bytes(await render(page, ICONS / source, size))
             print("✓", out.relative_to(ROOT), f"{size}×{size}")
 
-        source, name, size = SPLASH
-        out = (ICONS / name).resolve()
-        out.write_bytes(await render(page, ICONS / source, size, splash=True))
-        print("✓", out.relative_to(ROOT), f"{size}×{size}")
+        for source, name, size in (SPLASH, SPLASH_DARK):
+            out = (ICONS / name).resolve()
+            out.write_bytes(await render(page, ICONS / source, size, splash=True))
+            print("✓", out.relative_to(ROOT), f"{size}×{size}")
+
+        # стартовые экраны iOS для «На экран Домой» (apple-touch-startup-image)
+        for w, h in IOS_SPLASH:
+            out = ICONS / "splash" / f"ios-{w}x{h}.png"
+            out.parent.mkdir(exist_ok=True)
+            out.write_bytes(await render_splash(page, ICONS / "logo.svg", w, h))
+            print("✓", out.relative_to(ROOT), f"{w}×{h}")
         await browser.close()
 
     # favicon.ico с несколькими размерами внутри — для старых браузеров

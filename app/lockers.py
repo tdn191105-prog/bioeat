@@ -205,7 +205,12 @@ async def place_in_cell(session: AsyncSession, order: Order, cell_number: int | 
         stmt = stmt.where(LockerCell.number == cell_number)
     stmt = stmt.order_by(LockerCell.number)
     if not settings.is_sqlite:
-        stmt = stmt.with_for_update(skip_locked=True)
+        if cell_number is None:
+            # блокируем ровно одну свободную ячейку и пропускаем занятые другими —
+            # без LIMIT первый оператор заблокировал бы все, второй не нашёл бы ни одной
+            stmt = stmt.limit(1).with_for_update(skip_locked=True)
+        else:
+            stmt = stmt.with_for_update()
     candidates = (await session.scalars(stmt)).all()
     if not candidates:
         detail = (

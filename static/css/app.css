@@ -1597,3 +1597,10 @@ table.data tbody tr:hover { background: rgba(255, 255, 255, 0.025); }
 /* открыта клавиатура: прячем плавающие панели, чтобы они не легли на поле ввода */
 body.keyboard-open .tabbar,
 body.keyboard-open .action-bar { display: none !important; }
+
+/* Шапка секции с несколькими плашками (кабинет столовой) переносится, а не распирает экран:
+   на телефоне «постамат онлайн · выдано 9 · Обновить» шире 390 px */
+.section__head { flex-wrap: wrap; row-gap: 8px; }
+.section__head > .hstack { flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+.review-summary { display: grid; gap: 10px; grid-template-columns: 1fr; }
+@media (min-width: 700px) { .review-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

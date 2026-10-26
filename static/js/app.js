@@ -308,6 +308,21 @@ document.addEventListener('focusout', () => {
   }, 60);
 });
 
+/* Обёртка Capacitor (APK): системная кнопка «Назад» Android.
+   Сначала закрывает лист, потом шаг назад по истории, на первом экране — выход. */
+const nativeApp = window.Capacitor?.Plugins?.App;
+if (nativeApp && window.Capacitor.getPlatform?.() === 'android') {
+  nativeApp.addListener('backButton', ({ canGoBack }) => {
+    const sheet = document.querySelector('.sheet-host.is-open');
+    if (sheet) { closeSheet(); return; }
+    if (canGoBack && !location.hash.startsWith('#/login') && location.hash !== '#/') {
+      window.history.back();
+    } else {
+      nativeApp.exitApp();
+    }
+  });
+}
+
 /* Service worker — офлайн-оболочка PWA */
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
   window.addEventListener('load', () => {

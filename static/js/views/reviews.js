@@ -13,7 +13,7 @@ export default async function reviewsView() {
     roles: ['operator', 'admin'],
     html: `
       <div class="stack">
-        <div class="grid-2" id="summary">${skeletonList(2, 150)}</div>
+        <div class="review-summary" id="summary">${skeletonList(2, 150)}</div>
         <section class="section">
           <div class="stack stack--sm">
             <div class="chips" id="period"></div>
