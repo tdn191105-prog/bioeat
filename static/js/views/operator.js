@@ -29,7 +29,7 @@ export default async function operatorView() {
           <div class="stack stack--sm">
             <div class="searchbar">
               <span>🎫</span>
-              <input id="code" placeholder="Отсканируйте QR или введите номер BE-0000"
+              <input id="code" placeholder="Отсканируйте QR или введите номер RP-0000"
                      autocomplete="off" enterkeyhint="done" autocapitalize="characters">
             </div>
             <div class="grid-2">
@@ -258,7 +258,8 @@ export default async function operatorView() {
       root.querySelector('#lookup').onclick = async () => {
         const raw = codeInput.value.trim();
         if (!raw) return;
-        const number = raw.startsWith('BIOEAT:') ? raw.split(':')[1] : raw.toUpperCase();
+        // подписанный QR (ROSPIT: или старый BIOEAT:) и номер разбирает сервер
+        const number = raw;
         try {
           showOrder(await api.get(`/api/operator/lookup/${encodeURIComponent(number)}`));
         } catch (err) {

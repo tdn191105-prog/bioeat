@@ -1,0 +1,12 @@
+# Линтер проекта. B008 отключён: Depends(...) в аргументах — штатный приём FastAPI.
+line-length = 110
+target-version = "py312"
+extend-exclude = ["firmware", "mobile"]
+
+[lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "DTZ011", "RUF100"]
+# UP042: str+Enum оставляем — так статусы уже хранятся и сравниваются в базе
+ignore = ["B008", "E501", "SIM117", "SIM105", "UP042"]
+
+[lint.isort]
+known-first-party = ["app", "tests", "scripts"]

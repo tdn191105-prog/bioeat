@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="rp-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1f5bff"/>
+      <stop offset="1" stop-color="#4a86ff"/>
+    </linearGradient>
+  </defs>
+  <!-- maskable: фон на весь холст, знак в безопасной зоне 80 % (круг r=204,8) -->
+  <rect width="512" height="512" fill="url(#rp-bg)"/>
+  <g transform="translate(256 256) scale(0.72) translate(-256 -256)">
+    <rect x="150" y="118" width="64" height="290" rx="32" fill="#fff"/>
+    <circle cx="276" cy="208" r="90" fill="none" stroke="#fff" stroke-width="64"/>
+    <path d="M276 172c-26 14-34 40-22 66 26-8 38-34 22-66z" fill="#7cf0a6"/>
+  </g>
+</svg>

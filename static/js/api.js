@@ -1,6 +1,16 @@
 /* Тонкая обёртка над fetch: единый разбор ошибок и хранение токена. */
 
-const TOKEN_KEY = 'bioeat_token';
+const TOKEN_KEY = 'rospit_token';
+// ключ времён BioEat: переносим токен один раз, чтобы никого не разлогинить
+const LEGACY_TOKEN_KEY = 'bioeat_token';
+
+try {
+  const legacy = localStorage.getItem(LEGACY_TOKEN_KEY);
+  if (legacy) {
+    if (!localStorage.getItem(TOKEN_KEY)) localStorage.setItem(TOKEN_KEY, legacy);
+    localStorage.removeItem(LEGACY_TOKEN_KEY);
+  }
+} catch { /* приватный режим Safari */ }
 
 export const auth = {
   get token() {

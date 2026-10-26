@@ -1,5 +1,5 @@
 /* Офлайн-оболочка: кэшируем статику, API всегда идёт в сеть. */
-const CACHE = 'bioeat-v1';
+const CACHE = 'rospit-v1';
 const SHELL = [
   '/',
   '/static/css/app.css',
@@ -9,6 +9,7 @@ const SHELL = [
   '/static/js/state.js',
   '/static/js/components.js',
   '/static/icons/icon.svg',
+  '/static/icons/logo.svg',
   '/manifest.webmanifest',
 ];
 

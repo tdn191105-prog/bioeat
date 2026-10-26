@@ -1,8 +1,8 @@
-"""Модели базы данных BioEat (SQLAlchemy 2.0)."""
+"""Модели базы данных РосПит (SQLAlchemy 2.0)."""
 from __future__ import annotations
 
 import enum
-from datetime import date, datetime, time, timezone
+from datetime import UTC, date, datetime, time
 
 from sqlalchemy import (
     JSON,
@@ -22,7 +22,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
 def utcnow() -> datetime:
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 class Base(DeclarativeBase):
@@ -87,8 +87,8 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
-    orders: Mapped[list["Order"]] = relationship(back_populates="user")
-    cart: Mapped["Cart | None"] = relationship(back_populates="user", uselist=False)
+    orders: Mapped[list[Order]] = relationship(back_populates="user")
+    cart: Mapped[Cart | None] = relationship(back_populates="user", uselist=False)
 
 
 # --------------------------------------------------------------------------- #
@@ -105,7 +105,7 @@ class Category(Base):
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
-    dishes: Mapped[list["Dish"]] = relationship(
+    dishes: Mapped[list[Dish]] = relationship(
         back_populates="category", cascade="all, delete-orphan"
     )
 
@@ -180,7 +180,7 @@ class Cart(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
 
     user: Mapped[User] = relationship(back_populates="cart")
-    items: Mapped[list["CartItem"]] = relationship(
+    items: Mapped[list[CartItem]] = relationship(
         back_populates="cart", cascade="all, delete-orphan", lazy="selectin"
     )
 
@@ -205,7 +205,7 @@ class Order(Base):
     __tablename__ = "orders"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    number: Mapped[str] = mapped_column(String(16), unique=True, index=True)  # BE-0431
+    number: Mapped[str] = mapped_column(String(16), unique=True, index=True)  # RP-0431 (старые заказы — BE-0431)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     slot_id: Mapped[int | None] = mapped_column(
         ForeignKey("pickup_slots.id", ondelete="SET NULL"), nullable=True
@@ -231,10 +231,10 @@ class Order(Base):
     cancelled_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     user: Mapped[User] = relationship(back_populates="orders", lazy="joined")
-    items: Mapped[list["OrderItem"]] = relationship(
+    items: Mapped[list[OrderItem]] = relationship(
         back_populates="order", cascade="all, delete-orphan", lazy="selectin"
     )
-    payments: Mapped[list["Payment"]] = relationship(
+    payments: Mapped[list[Payment]] = relationship(
         back_populates="order", cascade="all, delete-orphan", lazy="selectin"
     )
 

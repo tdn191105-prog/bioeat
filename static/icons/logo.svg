@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 592 112" role="img" aria-label="РосПит">
+  <defs>
+    <linearGradient id="rp-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1f5bff"/>
+      <stop offset="1" stop-color="#4a86ff"/>
+    </linearGradient>
+  </defs>
+  <g transform="scale(0.21875)">
+    <rect width="512" height="512" rx="116" fill="url(#rp-bg)"/>
+    <rect x="150" y="118" width="64" height="290" rx="32" fill="#fff"/>
+    <circle cx="276" cy="208" r="90" fill="none" stroke="#fff" stroke-width="64"/>
+    <path d="M276 172c-26 14-34 40-22 66 26-8 38-34 22-66z" fill="#7cf0a6"/>
+  </g>
+  <!-- слово «РосПит» нарисовано линиями, без шрифтов -->
+  <g transform="translate(146 0)" fill="none" stroke="#fff" stroke-width="16"
+     stroke-linecap="round" stroke-linejoin="round">
+    <path d="M8 96V8h22a28 28 0 0 1 0 56H8"/>
+    <circle cx="106" cy="70" r="26"/>
+    <path d="M206.4 51.6a26 26 0 1 0 0 36.8"/>
+    <path d="M232 96V8h52v88"/>
+    <path d="M314 44v52l44-52v52"/>
+    <path d="M382 44h48M406 44v52"/>
+  </g>
+</svg>

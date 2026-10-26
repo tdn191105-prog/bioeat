@@ -11,10 +11,24 @@ from ..db import get_session
 from ..deps import staff_required
 from ..models import ACTIVE_STATUSES, Order, OrderStatus, utcnow
 from ..schemas import IssueIn, OrderOut, StatusPatch
-from ..services import ALLOWED_TRANSITIONS, cancel_order, campus_today, order_payload
 from ..security import verify_pickup_code
+from ..services import (
+    ALLOWED_TRANSITIONS,
+    campus_today,
+    cancel_order,
+    order_number_candidates,
+    order_payload,
+)
 
 router = APIRouter(prefix="/api/operator", tags=["operator"], dependencies=[Depends(staff_required)])
+
+
+async def find_by_number(session: AsyncSession, raw: str) -> Order | None:
+    for candidate in order_number_candidates(raw):
+        order = await session.scalar(select(Order).where(Order.number == candidate))
+        if order is not None:
+            return order
+    return None
 
 
 @router.get("/queue", response_model=list[OrderOut])
@@ -101,11 +115,8 @@ async def issue_by_code(data: IssueIn, session: AsyncSession = Depends(get_sessi
     number = verify_pickup_code(raw)
 
     if number is None:
-        # ручной ввод номера вида BE-1234
-        candidate = raw.upper().replace(" ", "")
-        if not candidate.startswith("BE-"):
-            candidate = f"BE-{candidate.lstrip('BE-')}"
-        order = await session.scalar(select(Order).where(Order.number == candidate))
+        # ручной ввод номера: RP-1234, старый BE-1234 или просто 1234
+        order = await find_by_number(session, raw)
         if order is None:
             raise HTTPException(status_code=404, detail="Код не распознан")
     else:
@@ -135,7 +146,8 @@ async def issue_by_code(data: IssueIn, session: AsyncSession = Depends(get_sessi
 
 @router.get("/lookup/{number}", response_model=OrderOut)
 async def lookup(number: str, session: AsyncSession = Depends(get_session)):
-    order = await session.scalar(select(Order).where(Order.number == number.upper()))
+    signed = verify_pickup_code(number)
+    order = await find_by_number(session, signed or number)
     if order is None:
         raise HTTPException(status_code=404, detail="Заказ не найден")
     return order_payload(order, with_customer=True)

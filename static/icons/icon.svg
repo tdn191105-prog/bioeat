@@ -1,9 +1,14 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="РосПит">
   <defs>
-    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#1f5bff"/><stop offset="1" stop-color="#4a86ff"/>
+    <linearGradient id="rp-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1f5bff"/>
+      <stop offset="1" stop-color="#4a86ff"/>
     </linearGradient>
   </defs>
-  <rect width="512" height="512" rx="112" fill="url(#g)"/>
-  <text x="256" y="330" font-size="240" text-anchor="middle">&#127857;</text>
+  <rect width="512" height="512" rx="116" fill="url(#rp-bg)"/>
+  <!-- «Р» из ложки: ручка — ножка буквы, чаша — петля -->
+  <rect x="150" y="118" width="64" height="290" rx="32" fill="#fff"/>
+  <circle cx="276" cy="208" r="90" fill="none" stroke="#fff" stroke-width="64"/>
+  <!-- зёрнышко в чаше — отсылка к биотехнологиям -->
+  <path d="M276 172c-26 14-34 40-22 66 26-8 38-34 22-66z" fill="#7cf0a6"/>
 </svg>

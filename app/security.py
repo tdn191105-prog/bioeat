@@ -90,20 +90,28 @@ def decode_access_token(token: str) -> dict | None:
 # --------------------------------------------------------------------------- #
 #  Коды выдачи заказа (тело QR)
 # --------------------------------------------------------------------------- #
+# Префикс тела QR. Старые коды BIOEAT: продолжают приниматься, чтобы заказы,
+# оформленные до переименования, можно было выдать.
+PICKUP_PREFIX = "ROSPIT"
+LEGACY_PICKUP_PREFIXES = ("BIOEAT",)
+
+
+def _pickup_signature(raw: str) -> str:
+    return hmac.new(settings.secret_key.encode(), raw.encode(), hashlib.sha256).hexdigest()[:12]
+
+
 def make_pickup_code(order_number: str) -> str:
-    """Подписанный код выдачи. Формат: BIOEAT:<номер>:<nonce>:<подпись>."""
+    """Подписанный код выдачи. Формат: ROSPIT:<номер>:<nonce>:<подпись>."""
     nonce = secrets.token_hex(6)
     raw = f"{order_number}:{nonce}"
-    sig = hmac.new(settings.secret_key.encode(), raw.encode(), hashlib.sha256).hexdigest()[:12]
-    return f"BIOEAT:{raw}:{sig}"
+    return f"{PICKUP_PREFIX}:{raw}:{_pickup_signature(raw)}"
 
 
 def verify_pickup_code(code: str) -> str | None:
     """Проверяет подпись кода и возвращает номер заказа."""
     parts = (code or "").strip().split(":")
-    if len(parts) != 4 or parts[0] != "BIOEAT":
+    if len(parts) != 4 or parts[0] not in (PICKUP_PREFIX, *LEGACY_PICKUP_PREFIXES):
         return None
     _, number, nonce, sig = parts
-    raw = f"{number}:{nonce}"
-    expected = hmac.new(settings.secret_key.encode(), raw.encode(), hashlib.sha256).hexdigest()[:12]
+    expected = _pickup_signature(f"{number}:{nonce}")
     return number if hmac.compare_digest(expected, sig) else None

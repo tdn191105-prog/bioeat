@@ -19,7 +19,7 @@ from .models import Category, Dish, PickupSlot, User, UserRole
 from .reference import slugify
 from .security import hash_password
 
-log = logging.getLogger("bioeat")
+log = logging.getLogger("rospit")
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DISH_IMAGES_DIR = BASE_DIR / "static" / "img" / "dishes"
@@ -172,7 +172,7 @@ SLOTS = [
 USERS = [
     ("student@rosbiotech.ru", "student", "Дмитрий Тапильский", UserRole.student, "23о-380302-УБ/1", 250),
     ("operator@rosbiotech.ru", "operator", "Оператор столовой", UserRole.operator, None, 0),
-    ("admin@rosbiotech.ru", "admin", "Администратор BioEat", UserRole.admin, None, 0),
+    ("admin@rosbiotech.ru", "admin", "Администратор РосПит", UserRole.admin, None, 0),
 ]
 
 
@@ -231,7 +231,21 @@ async def backfill_dish_details(session: AsyncSession) -> dict:
     return {"details": filled_details, "images": filled_images}
 
 
+async def rename_legacy_brand(session: AsyncSession) -> None:
+    """Подписи из времён BioEat в уже развёрнутой базе меняем на РосПит.
+
+    Трогаем только то, что seed сам когда-то создал, — ручные правки не задеваем.
+    """
+    admin = await session.scalar(
+        select(User).where(User.full_name == "Администратор BioEat")
+    )
+    if admin is not None:
+        admin.full_name = "Администратор РосПит"
+        await session.commit()
+
+
 async def seed(session: AsyncSession, force: bool = False) -> dict:
+    await rename_legacy_brand(session)
     existing = await session.scalar(select(func.count()).select_from(Category))
     if existing and not force:
         # меню уже есть, но новые поля могли появиться вместе с обновлением

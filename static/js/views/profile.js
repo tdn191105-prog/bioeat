@@ -79,7 +79,8 @@ export default async function profileView() {
         <section class="section">
           <div class="stack stack--sm small muted">
             <div class="bold" style="color:var(--text)">О приложении</div>
-            <div>BioEat — предзаказ питания в столовой РОСБИОТЕХ. Версия MVP 1.0.</div>
+            <img src="/static/icons/logo.svg" alt="РосПит" width="148" height="28" style="margin:4px 0">
+            <div>РосПит — предзаказ питания в столовой РОСБИОТЕХ. Версия 1.1.</div>
             <div>Оплата работает в демонстрационном режиме: обращений к банковским системам и СБП не происходит.</div>
           </div>
         </section>

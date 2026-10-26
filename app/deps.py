@@ -8,14 +8,16 @@ from .db import get_session
 from .models import User, UserRole
 from .security import decode_access_token
 
-COOKIE_NAME = "bioeat_token"
+COOKIE_NAME = "rospit_token"
+# cookie времён BioEat: читаем, чтобы никого не разлогинить; при входе стираем
+LEGACY_COOKIE_NAME = "bioeat_token"
 
 
 def _extract_token(request: Request) -> str | None:
     auth = request.headers.get("Authorization", "")
     if auth.lower().startswith("bearer "):
         return auth[7:].strip()
-    return request.cookies.get(COOKIE_NAME)
+    return request.cookies.get(COOKIE_NAME) or request.cookies.get(LEGACY_COOKIE_NAME)
 
 
 async def current_user_optional(

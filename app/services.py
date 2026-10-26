@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import random
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 
 from fastapi import HTTPException
@@ -53,7 +53,7 @@ MAX_BONUS_SHARE = Decimal("0.30")  # бонусами можно закрыть 
 
 def campus_now() -> datetime:
     """Текущее время кампуса (Москва) без таймзоны."""
-    return datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(
+    return datetime.now(UTC).replace(tzinfo=None) + timedelta(
         hours=settings.tz_offset_hours
     )
 
@@ -218,14 +218,37 @@ async def slots_payload(session: AsyncSession, on_date: date | None = None) -> l
 # --------------------------------------------------------------------------- #
 #  Заказы
 # --------------------------------------------------------------------------- #
+ORDER_PREFIX = "RP"
+# заказы, оформленные до переименования, имеют номера BE-xxxx
+LEGACY_ORDER_PREFIXES = ("BE",)
+
+
 async def generate_order_number(session: AsyncSession) -> str:
     for _ in range(20):
-        number = f"BE-{random.randint(1000, 9999)}"
+        number = f"{ORDER_PREFIX}-{random.randint(1000, 9999)}"
         exists = await session.scalar(select(Order.id).where(Order.number == number))
         if not exists:
             return number
     count = await session.scalar(select(func.count()).select_from(Order)) or 0
-    return f"BE-{10000 + count}"
+    return f"{ORDER_PREFIX}-{10000 + count}"
+
+
+def order_number_candidates(raw: str) -> list[str]:
+    """Варианты номера заказа для ручного ввода на выдаче.
+
+    Принимаем «RP-1234», «rp 1234», старый «BE-1234» и просто «1234»
+    (тогда сначала ищем новый номер, потом старый).
+    """
+    text = (raw or "").upper().replace(" ", "").replace("–", "-")
+    for prefix in (ORDER_PREFIX, *LEGACY_ORDER_PREFIXES):
+        if text.startswith(f"{prefix}-"):
+            return [text]
+        if text.startswith(prefix) and text[len(prefix):].isdigit():
+            return [f"{prefix}-{text[len(prefix):]}"]
+    digits = text.lstrip("-")
+    if digits.isdigit():
+        return [f"{p}-{digits}" for p in (ORDER_PREFIX, *LEGACY_ORDER_PREFIXES)]
+    return [text] if text else []
 
 
 def order_payload(order: Order, *, with_customer: bool = False) -> dict:

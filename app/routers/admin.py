@@ -30,6 +30,7 @@ from ..models import (
     User,
     UserRole,
 )
+from ..reference import slugify
 from ..schemas import (
     CategoryIn,
     CategoryOut,
@@ -42,7 +43,6 @@ from ..schemas import (
     StatsOut,
     UserOut,
 )
-from ..reference import slugify
 from ..security import hash_password
 from ..services import campus_today, money, slots_payload
 
@@ -59,7 +59,9 @@ def parse_time(value: str) -> time:
         hh, mm = value.strip().split(":")[:2]
         return time(int(hh), int(mm))
     except (ValueError, IndexError):
-        raise HTTPException(status_code=422, detail=f"Некорректное время: {value}. Формат ЧЧ:ММ")
+        raise HTTPException(
+            status_code=422, detail=f"Некорректное время: {value}. Формат ЧЧ:ММ"
+        ) from None
 
 
 # --------------------------------------------------------------------------- #

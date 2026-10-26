@@ -18,11 +18,8 @@ export default async function authView() {
     html: `
       <div class="stack" style="padding-top:8px">
         <div class="center" style="padding:22px 0 6px">
-          <div style="width:76px;height:76px;border-radius:24px;margin:0 auto 14px;
-                      background:linear-gradient(135deg,#1f5bff,#4a86ff);display:grid;place-items:center;font-size:36px">
-            🍱
-          </div>
-          <h1 style="font-size:29px;font-weight:900;letter-spacing:-0.8px;margin:0">BioEat</h1>
+          <img class="brand-logo" src="/static/icons/logo.svg" alt="" width="222" height="42">
+          <h1 class="visually-hidden">РосПит</h1>
           <p class="muted small" style="margin:6px 0 0">Предзаказ питания в столовой РОСБИОТЕХ</p>
         </div>
 

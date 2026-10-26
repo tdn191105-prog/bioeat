@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from .config import settings
 from .models import Base
 
-log = logging.getLogger("bioeat")
+log = logging.getLogger("rospit")
 
 engine = create_async_engine(
     settings.database_url,
@@ -57,7 +57,7 @@ def _column_sql_type(column) -> str:
         return "TIMESTAMP"
     try:
         return type_.compile(dialect=engine.dialect)
-    except Exception:  # noqa: BLE001 — экзотический тип: пусть решает база
+    except Exception:
         return "TEXT"
 
 
@@ -121,7 +121,7 @@ async def ensure_columns() -> list[str]:
                     await conn.execute(text(f'ALTER TABLE "{table_name}" {fragment}'))
                     added.append(f"{table_name}.{column_name}")
                     log.info("Автомиграция: добавлена колонка %s.%s", table_name, column_name)
-                except Exception as exc:  # noqa: BLE001
+                except Exception as exc:
                     log.warning(
                         "Автомиграция: не удалось добавить колонку %s.%s (%s). "
                         "Добавьте её вручную или примените миграцию.",
@@ -129,7 +129,7 @@ async def ensure_columns() -> list[str]:
                         column_name,
                         exc,
                     )
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         log.warning(
             "Автомиграция пропущена: не удалось прочитать схему базы (%s). "
             "Приложение продолжит работу на текущей схеме.",

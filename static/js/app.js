@@ -94,8 +94,8 @@ function renderNav(path) {
 
   el.rail.innerHTML = `
     <a class="rail__brand" href="#/">
-      <span class="rail__logo">🍱</span>
-      <span>BioEat</span>
+      <img class="rail__logo" src="/static/icons/icon.svg" alt="" width="34" height="34">
+      <span>РосПит</span>
     </a>
     ${NAV.map((n) => item(n, 'rail__item')).join('')}
     ${
@@ -164,8 +164,8 @@ async function render() {
     return;
   }
 
-  el.title.textContent = view.title || 'BioEat';
-  document.title = `${view.title || 'BioEat'} · BioEat`;
+  el.title.textContent = view.title || 'РосПит';
+  document.title = view.title ? `${view.title} · РосПит` : 'РосПит · Столовая РОСБИОТЕХ';
   el.shell.classList.toggle('shell--wide', !!view.wide);
   el.back.style.visibility = BACKABLE.includes(path) || path.startsWith('/pay') || path.startsWith('/order/')
     ? 'visible'

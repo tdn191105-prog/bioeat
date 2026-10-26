@@ -1,13 +1,13 @@
 """Аутентификация: вход, регистрация, профиль."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import settings
 from ..db import get_session
-from ..deps import COOKIE_NAME, current_user
+from ..deps import COOKIE_NAME, LEGACY_COOKIE_NAME, current_user
 from ..models import User, UserRole
 from ..schemas import AuthOut, LoginIn, RegisterIn, UserOut
 from ..security import create_access_token, hash_password, verify_password
@@ -24,6 +24,7 @@ def _set_cookie(response: Response, token: str) -> None:
         max_age=settings.access_token_ttl_minutes * 60,
         path="/",
     )
+    response.delete_cookie(LEGACY_COOKIE_NAME, path="/")
 
 
 @router.post("/login", response_model=AuthOut)
@@ -64,9 +65,14 @@ async def register(
 @router.post("/logout")
 async def logout(response: Response):
     response.delete_cookie(COOKIE_NAME, path="/")
+    response.delete_cookie(LEGACY_COOKIE_NAME, path="/")
     return {"ok": True}
 
 
 @router.get("/me", response_model=UserOut)
-async def me(user: User = Depends(current_user)):
+async def me(request: Request, response: Response, user: User = Depends(current_user)):
+    # переносим сессию со старой cookie BioEat на новую — один раз и незаметно
+    legacy = request.cookies.get(LEGACY_COOKIE_NAME)
+    if legacy and not request.cookies.get(COOKIE_NAME):
+        _set_cookie(response, legacy)
     return user

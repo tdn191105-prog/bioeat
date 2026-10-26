@@ -1,4 +1,4 @@
-"""BioEat — предзаказ питания в столовой РОСБИОТЕХ.
+"""РосПит — предзаказ питания в столовой РОСБИОТЕХ.
 
 Точка входа FastAPI: подключает роутеры, отдаёт клиент (PWA) и поднимает схему БД.
 """
@@ -19,7 +19,7 @@ from .db import SessionLocal, create_all, engine, ensure_columns
 from .routers import admin, auth, cart, menu, operator, orders
 from .seed import seed
 
-log = logging.getLogger("bioeat")
+log = logging.getLogger("rospit")
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -37,7 +37,7 @@ async def lifespan(app: FastAPI):
             await create_all()
             last_error = None
             break
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             last_error = exc
             log.warning("База ещё не готова (попытка %s/30): %s", attempt, exc)
             await asyncio.sleep(2)
@@ -51,7 +51,7 @@ async def lifespan(app: FastAPI):
 
     async with SessionLocal() as session:
         result = await seed(session)
-    log.info("BioEat запущен. Seed: %s", result)
+    log.info("РосПит запущен. Seed: %s", result)
     yield
 
     # закрываем пул: рабочий поток aiosqlite не демонический и иначе
@@ -60,12 +60,12 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="BioEat API",
+    title="РосПит API",
     description=(
         "Предзаказ питания в столовой РОСБИОТЕХ. "
         "Платежи работают в демонстрационном режиме и не обращаются к реальным системам."
     ),
-    version="1.0.0",
+    version="1.1.0",
     lifespan=lifespan,
     docs_url="/api/docs",
     redoc_url=None,
@@ -124,7 +124,7 @@ async def service_worker():
 
 @app.get("/favicon.ico", include_in_schema=False)
 async def favicon():
-    return FileResponse(STATIC_DIR / "icons" / "icon.svg", media_type="image/svg+xml")
+    return FileResponse(STATIC_DIR / "icons" / "favicon.ico", media_type="image/x-icon")
 
 
 @app.get("/{full_path:path}", include_in_schema=False)

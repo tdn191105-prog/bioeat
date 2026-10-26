@@ -1,14 +1,13 @@
-"""Сквозные тесты API BioEat.
+"""Сквозные тесты API РосПит.
 
 Запуск:  pytest -q
 База:    отдельная SQLite-файловая БД (реальный Postgres не требуется).
 """
 from __future__ import annotations
 
-import os
 import pathlib
 import sys
-from datetime import date, timedelta
+from datetime import timedelta
 
 import pytest
 import pytest_asyncio
@@ -16,29 +15,25 @@ import pytest_asyncio
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-TEST_DB = ROOT / "test_bioeat.db"
-os.environ["DATABASE_URL"] = f"sqlite+aiosqlite:///{TEST_DB}"
-os.environ["SECRET_KEY"] = "test-secret"
+# база и секрет задаются в conftest.py — одна на весь прогон
 
 from asgi_lifespan import LifespanManager  # noqa: E402
 from httpx import ASGITransport, AsyncClient  # noqa: E402
 
 from app.main import app  # noqa: E402
+from app.services import campus_today  # noqa: E402
 
-TOMORROW = (date.today() + timedelta(days=1)).isoformat()
+# время кампуса, а не машины: около полуночи по UTC иначе «завтра» разъезжается
+TOMORROW = (campus_today() + timedelta(days=1)).isoformat()
 
 pytestmark = pytest.mark.asyncio
 
 
 @pytest_asyncio.fixture(scope="module")
 async def client():
-    if TEST_DB.exists():
-        TEST_DB.unlink()
     async with LifespanManager(app):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
             yield c
-    if TEST_DB.exists():
-        TEST_DB.unlink()
 
 
 async def login(client, email, password):
@@ -239,7 +234,7 @@ async def test_past_date_rejected(client):
     dishes = (await client.get("/api/dishes")).json()
     await client.post("/api/cart/items", json={"dish_id": dishes[1]["id"], "qty": 1}, headers=h)
     slots = (await client.get(f"/api/slots?date={TOMORROW}")).json()
-    yesterday = (date.today() - timedelta(days=1)).isoformat()
+    yesterday = (campus_today() - timedelta(days=1)).isoformat()
     r = await client.post(
         "/api/orders", json={"slot_id": slots[0]["id"], "pickup_date": yesterday}, headers=h
     )
@@ -462,7 +457,8 @@ async def test_registration_and_role_change(client):
 async def test_spa_fallback_and_unknown_api(client):
     r = await client.get("/some/deep/route")
     assert r.status_code == 200
-    assert "BioEat" in r.text
+    assert "РосПит" in r.text
+    assert "BioEat" not in r.text
 
     r = await client.get("/api/definitely-missing")
     assert r.status_code == 404

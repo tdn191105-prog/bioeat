@@ -1,4 +1,4 @@
-"""Конфигурация приложения BioEat."""
+"""Конфигурация приложения РосПит."""
 from functools import lru_cache
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -7,7 +7,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    app_name: str = "BioEat"
+    app_name: str = "rospit"
     # Полный DSN базы. По умолчанию — Postgres из docker-compose.
     database_url: str = "postgresql+asyncpg://bioeat:bioeat@db:5432/bioeat"
     secret_key: str = "dev-secret-change-me-in-production"

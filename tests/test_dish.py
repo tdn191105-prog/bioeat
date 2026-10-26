@@ -7,7 +7,6 @@
 from __future__ import annotations
 
 import io
-import os
 import pathlib
 import sys
 
@@ -17,9 +16,7 @@ import pytest_asyncio
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-TEST_DB = ROOT / "test_bioeat_dish.db"
-os.environ["DATABASE_URL"] = f"sqlite+aiosqlite:///{TEST_DB}"
-os.environ["SECRET_KEY"] = "test-secret"
+# база и секрет задаются в conftest.py — одна на весь прогон
 
 from asgi_lifespan import LifespanManager  # noqa: E402
 from httpx import ASGITransport, AsyncClient  # noqa: E402
@@ -34,13 +31,9 @@ pytestmark = pytest.mark.asyncio
 
 @pytest_asyncio.fixture(scope="module")
 async def client():
-    if TEST_DB.exists():
-        TEST_DB.unlink()
     async with LifespanManager(app):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
             yield c
-    if TEST_DB.exists():
-        TEST_DB.unlink()
 
 
 async def login(client, email, password):
@@ -292,9 +285,11 @@ async def _make_paid_order(client, token) -> dict:
     slots = (await client.get("/api/slots")).json()
     slot = next((s for s in slots if s["is_available"]), None)
     if slot is None:  # приём на сегодня закрыт — оформляем на завтра
-        from datetime import date, timedelta
+        from datetime import timedelta
 
-        tomorrow = (date.today() + timedelta(days=1)).isoformat()
+        from app.services import campus_today
+
+        tomorrow = (campus_today() + timedelta(days=1)).isoformat()
         slots = (await client.get(f"/api/slots?date={tomorrow}")).json()
         slot = next(s for s in slots if s["is_available"])
         payload = {"slot_id": slot["id"], "pickup_date": tomorrow}

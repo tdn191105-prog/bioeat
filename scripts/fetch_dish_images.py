@@ -49,7 +49,7 @@ ATTRIBUTION = OUT_DIR / "attribution.json"
 
 PROVIDERS = ("local", "openverse", "wikimedia", "pexels")
 # заголовок только из ASCII — httpx кодирует его в latin-1
-USER_AGENT = "BioEat/1.0 (student project; dish photo fetcher; +https://rosbiotech.ru)"
+USER_AGENT = "RosPit/1.1 (student project; dish photo fetcher; +https://rosbiotech.ru)"
 TIMEOUT = httpx.Timeout(20.0, connect=10.0)
 MAX_DOWNLOAD_BYTES = 12 * 1024 * 1024
 
@@ -292,7 +292,7 @@ async def handle_dish(
     log(f"  · {dish.name}")
     try:
         found = await candidates_for(client, dish.name, slug, providers)
-    except Exception as exc:  # noqa: BLE001 — сеть не должна ронять весь прогон
+    except Exception as exc:
         return Result(dish.name, slug, "failed", reason=f"поиск не удался: {exc}")
 
     if not found:
@@ -385,7 +385,7 @@ def write_preview(results: list[Result], attribution: dict, all_dishes: list[str
         f"""<!doctype html>
 <html lang="ru">
 <meta charset="utf-8">
-<title>BioEat — контактный лист фотографий блюд</title>
+<title>РосПит — контактный лист фотографий блюд</title>
 <style>
   body {{ background:#111; color:#eee; font:14px/1.45 -apple-system, Segoe UI, Roboto, sans-serif;
          margin:0; padding:28px; }}
