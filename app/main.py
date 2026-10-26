@@ -16,7 +16,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .config import settings
 from .db import SessionLocal, create_all, engine, ensure_columns
-from .routers import admin, auth, cart, menu, operator, orders
+from .routers import admin, auth, cart, locker_device, menu, operator, orders
 from .seed import seed
 from .services import expire_unpaid_orders
 
@@ -117,6 +117,7 @@ app.include_router(cart.router)
 app.include_router(orders.router)
 app.include_router(operator.router)
 app.include_router(admin.router)
+app.include_router(locker_device.router)
 
 
 @app.get("/api/health")

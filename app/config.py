@@ -25,6 +25,12 @@ class Settings(BaseSettings):
     unpaid_order_ttl_minutes: int = 15
     # Как часто фоновая задача ищет просроченные неоплаченные заказы, секунд
     expire_sweep_seconds: int = 60
+    # Постамат: срок жизни одноразового QR/PIN, «онлайн» по heartbeat,
+    # допустимое расхождение часов устройства и лимит неверных PIN
+    pickup_token_ttl_seconds: int = 120
+    locker_online_seconds: int = 90
+    device_clock_skew_seconds: int = 30
+    pin_attempts_per_5min: int = 5
     cors_origins: str = "*"
 
     @property

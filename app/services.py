@@ -10,6 +10,12 @@ from sqlalchemy import func, inspect, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .config import settings
+from .lockers import (
+    lockers_status,
+    pickup_snapshot,
+    refresh_locker_points,
+    release_cell,
+)
 from .models import (
     ACTIVE_STATUSES,
     TO_COLLECT_STATUSES,
@@ -336,6 +342,7 @@ def order_payload(order: Order, *, with_customer: bool = False) -> dict:
         "issued_at": order.issued_at,
         "items": sorted(order.items, key=lambda i: i.id),
         "cancel_reason": order.cancel_reason or "",
+        **pickup_snapshot(order),
     }
     deadline = order_deadline(order)
     data["order_deadline"] = deadline
@@ -496,6 +503,9 @@ async def cancel_order(
         raise HTTPException(status_code=409, detail="Заказ уже закрыт")
 
     was_paid = order.status != OrderStatus.created
+    if order.status == OrderStatus.in_locker:
+        # заказ лежит в ячейке: освобождаем её и открываем дверцу, чтобы забрать
+        await release_cell(session, order, open_reason="unload")
     await restore_stock(session, order)
 
     user = await session.get(User, order.user_id)
@@ -719,6 +729,9 @@ def collect_summary(orders: list[Order]) -> list[dict]:
 async def shift_payload(session: AsyncSession, on_date: date) -> dict:
     """Перемены дня: отсечка, счётчики по статусам, сводка сборки и заказы."""
     await expire_unpaid_orders(session)
+    await refresh_locker_points(session)
+    lockers = await lockers_status(session)
+    lockers_by_point = {item["point"]: item for item in lockers}
     now = campus_now()
     slots = (
         await session.scalars(select(PickupSlot).order_by(PickupSlot.sort_order, PickupSlot.starts_at))
@@ -757,9 +770,15 @@ async def shift_payload(session: AsyncSession, on_date: date) -> dict:
             "to_collect": collect_summary(to_collect),
             "all_items": collect_summary(active),
             "orders": [order_payload(o, with_customer=True) for o in active],
-            "is_locker": False,
-            "locker": None,
         }
+        point = data["point"]
+        locker = lockers_by_point.get(point)
+        data["is_locker"] = locker is not None
+        data["locker"] = (
+            {k: locker[k] for k in ("id", "name", "is_online", "cells_free", "cells_total")}
+            if locker
+            else None
+        )
         if slot is not None:
             deadline = slot_deadline(slot, on_date)
             ends = datetime.combine(on_date, slot.ends_at)
@@ -799,6 +818,7 @@ async def shift_payload(session: AsyncSession, on_date: date) -> dict:
         "current_slot_id": current,
         "slots": sections,
         "issued_count": sum(s["counts"]["issued"] for s in sections),
+        "lockers": [{k: v for k, v in item.items() if k != "cells"} for item in lockers],
         "active_count": sum(s["total"] for s in sections),
     }
 

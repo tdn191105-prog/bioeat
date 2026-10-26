@@ -9,8 +9,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_session
 from ..deps import staff_required
-from ..models import ACTIVE_STATUSES, Order, OrderStatus, utcnow
-from ..schemas import IssueIn, OrderOut, StatusPatch
+from ..lockers import (
+    enqueue_command,
+    locker_online,
+    lockers_status,
+    place_in_cell,
+    release_cell,
+)
+from ..models import ACTIVE_STATUSES, CellState, Locker, LockerCell, Order, OrderStatus, utcnow
+from ..schemas import IssueIn, OrderOut, PlaceIn, StatusPatch
 from ..security import verify_pickup_code
 from ..services import (
     ALLOWED_TRANSITIONS,
@@ -159,16 +166,85 @@ async def issue_by_code(data: IssueIn, session: AsyncSession = Depends(get_sessi
         raise HTTPException(status_code=409, detail=f"Заказ {order.number} отменён")
     if order.status == OrderStatus.created:
         raise HTTPException(status_code=409, detail=f"Заказ {order.number} не оплачен")
-    if order.status != OrderStatus.ready:
+    if order.status not in (OrderStatus.ready, OrderStatus.in_locker):
         raise HTTPException(
             status_code=409, detail=f"Заказ {order.number} ещё не готов к выдаче"
         )
 
+    if order.status == OrderStatus.in_locker:
+        # «ячейка не открылась»: оператор достаёт заказ сам и выдаёт в окне
+        await release_cell(session, order, open_reason="unload")
     order.status = OrderStatus.issued
     order.issued_at = utcnow()
     await session.commit()
     await session.refresh(order, ["items", "user"])
     return order_payload(order, with_customer=True)
+
+
+# --------------------------------------------------------------------------- #
+#  Постамат
+# --------------------------------------------------------------------------- #
+@router.post("/orders/{order_id}/place", response_model=OrderOut)
+async def place(order_id: int, data: PlaceIn, session: AsyncSession = Depends(get_session)):
+    """«Положен в ячейку»: сервер занимает свободную ячейку (или указанную) и открывает её."""
+    order = await session.get(Order, order_id)
+    if order is None:
+        raise HTTPException(status_code=404, detail="Заказ не найден")
+    order = await place_in_cell(session, order, data.cell_number)
+    await session.refresh(order, ["items", "user", "locker"])
+    return order_payload(order, with_customer=True)
+
+
+@router.post("/orders/{order_id}/unload", response_model=OrderOut)
+async def unload(order_id: int, session: AsyncSession = Depends(get_session)):
+    """Заказ не забрали до конца дня: ячейка открывается, заказ возвращается в окно выдачи."""
+    order = await session.get(Order, order_id)
+    if order is None:
+        raise HTTPException(status_code=404, detail="Заказ не найден")
+    if order.status != OrderStatus.in_locker:
+        raise HTTPException(status_code=409, detail="Заказ не лежит в ячейке")
+    await release_cell(session, order, open_reason="unload")
+    order.status = OrderStatus.ready
+    order.locker_id = None
+    order.cell_number = None
+    order.placed_at = None
+    order.picked_up_at = None
+    await session.commit()
+    await session.refresh(order, ["items", "user"])
+    return order_payload(order, with_customer=True)
+
+
+@router.get("/lockers")
+async def lockers(session: AsyncSession = Depends(get_session)):
+    return await lockers_status(session)
+
+
+@router.post("/lockers/{locker_id}/cells/{number}/open")
+async def open_cell(locker_id: int, number: int, session: AsyncSession = Depends(get_session)):
+    """Открыть ячейку с сервера (обслуживание, проверка). Команда уйдёт устройству long-polling."""
+    locker = await session.get(Locker, locker_id)
+    if locker is None or number not in {c.number for c in locker.cells}:
+        raise HTTPException(status_code=404, detail="Ячейка не найдена")
+    await enqueue_command(session, locker, number, "service")
+    await session.commit()
+    return {"ok": True, "online": locker_online(locker)}
+
+
+@router.post("/lockers/{locker_id}/cells/{number}/service")
+async def cell_service(
+    locker_id: int, number: int, out_of_service: bool, session: AsyncSession = Depends(get_session)
+):
+    """Пометить ячейку неисправной (или вернуть в работу), чтобы туда не клали заказы."""
+    cell = await session.scalar(
+        select(LockerCell).where(LockerCell.locker_id == locker_id, LockerCell.number == number)
+    )
+    if cell is None:
+        raise HTTPException(status_code=404, detail="Ячейка не найдена")
+    if cell.order_id and out_of_service:
+        raise HTTPException(status_code=409, detail="В ячейке лежит заказ — сначала заберите его")
+    cell.state = CellState.out_of_service if out_of_service else CellState.free
+    await session.commit()
+    return {"ok": True, "state": cell.state.value}
 
 
 @router.get("/lookup/{number}", response_model=OrderOut)

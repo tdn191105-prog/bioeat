@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .config import settings
 from .db import SessionLocal, create_all, engine, ensure_columns
 from .dish_details import DISH_DETAILS
+from .lockers import refresh_locker_points, seed_lockers
 from .models import Category, Dish, PickupSlot, User, UserRole
 from .reference import slugify
 from .security import hash_password
@@ -247,6 +248,9 @@ async def rename_legacy_brand(session: AsyncSession) -> None:
 
 async def seed(session: AsyncSession, force: bool = False) -> dict:
     await rename_legacy_brand(session)
+    # постамат появился позже меню — заводим его и в уже наполненной базе
+    await seed_lockers(session)
+    await refresh_locker_points(session)
     existing = await session.scalar(select(func.count()).select_from(Category))
     if existing and not force:
         # меню уже есть, но новые поля могли появиться вместе с обновлением

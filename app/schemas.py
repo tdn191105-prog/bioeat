@@ -258,6 +258,12 @@ class OrderOut(BaseModel):
     deadline_time: str | None = None
     can_cancel: bool = False                 # может ли студент отменить сам
     pay_until: datetime | None = None        # UTC: до какого момента ждём оплату
+    pickup_kind: str = "window"              # window | locker
+    locker_id: int | None = None
+    locker_name: str = ""
+    cell_number: int | None = None
+    placed_at: datetime | None = None
+    picked_up_at: datetime | None = None
 
 
 class PayIn(BaseModel):
@@ -280,6 +286,46 @@ class StatusPatch(BaseModel):
 
 class IssueIn(BaseModel):
     code: str
+
+
+class PlaceIn(BaseModel):
+    # None — сервер выберет свободную ячейку сам
+    cell_number: int | None = Field(default=None, ge=1, le=999)
+
+
+class PickupTokenOut(BaseModel):
+    code: str             # тело QR: ROSPIT:L:<token>
+    pin: str              # запасной вариант без камеры
+    expires_at: datetime  # UTC
+    ttl_seconds: int
+    refresh_after_seconds: int
+    qr_svg: str
+    cell_number: int | None = None
+    locker_name: str = ""
+
+
+class DeviceScanIn(BaseModel):
+    code: str = Field(max_length=200)
+    ts: int
+    nonce: str = Field(min_length=8, max_length=64)
+    sig: str = Field(min_length=64, max_length=64)
+
+
+class DeviceEventIn(BaseModel):
+    # door_opened | door_closed | cell_empty | door_jammed
+    type: str = Field(max_length=30)
+    cell: int | None = Field(default=None, ge=1, le=999)
+    empty: bool | None = None
+    ts: int
+    nonce: str = Field(min_length=8, max_length=64)
+    sig: str = Field(min_length=64, max_length=64)
+
+
+class DeviceHeartbeatIn(BaseModel):
+    firmware: str = Field(default="", max_length=40)
+    ts: int
+    nonce: str = Field(min_length=8, max_length=64)
+    sig: str = Field(min_length=64, max_length=64)
 
 
 # ------------------------------- Статистика --------------------------------- #

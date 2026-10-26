@@ -7,3 +7,4 @@ __pycache__/
 static/uploads/dishes/*
 !static/uploads/dishes/.gitkeep
 scripts/out/
+firmware/esp32_locker/config.h

@@ -1523,3 +1523,7 @@ table.data tbody tr:hover { background: rgba(255, 255, 255, 0.025); }
   .print-sheet td { border-bottom: 1px solid #999; padding: 4pt 6pt; vertical-align: top; }
   .section { background: none !important; box-shadow: none !important; }
 }
+
+/* PIN постамата под одноразовым QR */
+.locker-pin { font-size: 15px; color: var(--text-2); letter-spacing: .5px; }
+.locker-pin b { font-size: 26px; color: var(--text); letter-spacing: 3px; font-variant-numeric: tabular-nums; }

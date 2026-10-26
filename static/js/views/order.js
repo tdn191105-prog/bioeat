@@ -60,7 +60,9 @@ export default async function orderView(ctx) {
         // правило отмены считает сервер: до отсечки перемены — сам, после — через оператора
         const cancellable = order.can_cancel;
         const lockedByDeadline = ['paid', 'accepted'].includes(order.status) && !order.can_cancel;
-        const showQr = ['paid', 'accepted', 'cooking', 'ready', 'in_locker'].includes(order.status);
+        const locker = order.pickup_kind === 'locker';
+        const showQr = !locker && ['paid', 'accepted', 'cooking', 'ready'].includes(order.status);
+        const waitLocker = locker && ['paid', 'accepted', 'cooking', 'ready'].includes(order.status);
         body.innerHTML = `
           ${
             order.status === 'cancelled'
@@ -78,6 +80,31 @@ export default async function orderView(ctx) {
               : ''
           }
 
+          ${
+            order.status === 'in_locker'
+              ? `<section class="section center">
+                   <div class="small muted">Поднесите код к сканеру постамата</div>
+                   <div class="qr-box mt-16" id="locker-qr"><div class="skeleton" style="height:100%"></div></div>
+                   <div class="locker-pin mt-16" id="locker-pin" aria-live="polite"></div>
+                   <div class="small muted" id="locker-timer">Код одноразовый и обновляется каждую минуту</div>
+                   <div class="mt-16">
+                     <span class="status-pill status-pill--in_locker">📦 ${esc(lockerText(order))}</span>
+                   </div>
+                   <div class="small muted mt-8">Нет камеры у сканера? Введите PIN на клавиатуре постамата.</div>
+                 </section>`
+              : ''
+          }
+          ${
+            waitLocker
+              ? `<section class="section center">
+                   <div style="font-size:46px">📦</div>
+                   <div class="big-number mt-8">${esc(order.number)}</div>
+                   <div class="bold mt-8">${order.status === 'ready' ? 'Заказ собран — скоро положим в ячейку' : 'Заказ заберёте в постамате'}</div>
+                   <div class="small muted">${esc(order.pickup_point)}. Номер ячейки и одноразовый QR появятся здесь, когда заказ положат в постамат.</div>
+                   <div class="mt-16"><span class="status-pill status-pill--${esc(order.status)}">${esc(order.status_label)}</span></div>
+                 </section>`
+              : ''
+          }
           ${
             showQr
               ? `<section class="section center">
@@ -113,7 +140,7 @@ export default async function orderView(ctx) {
               <div class="row"><span class="row__label">Дата</span><span class="bold">${dateLabel(order.pickup_date)}</span></div>
               <div class="row"><span class="row__label">Окно выдачи</span><span class="bold nowrap">${esc(order.slot_label)}</span></div>
               <div class="row"><span class="row__label">Точка</span><span class="bold" style="text-align:right">${esc(order.pickup_point)}</span></div>
-              ${order.deadline_time && !['issued', 'cancelled'].includes(order.status) ? `<div class="row"><span class="row__label">Приём заказов</span><span class="bold">до ${esc(order.deadline_time)}</span></div>` : ''}
+              ${order.deadline_time && ['created', 'paid', 'accepted'].includes(order.status) ? `<div class="row"><span class="row__label">Приём заказов</span><span class="bold">до ${esc(order.deadline_time)}</span></div>` : ''}
               ${order.comment ? `<div class="row"><span class="row__label">Комментарий</span><span style="text-align:right">${esc(order.comment)}</span></div>` : ''}
             </div>
           </section>
@@ -187,6 +214,47 @@ export default async function orderView(ctx) {
         body.querySelectorAll('[data-goto]').forEach((el) => {
           el.onclick = () => go(el.dataset.goto);
         });
+        syncLockerCode();
+      };
+
+      /* Одноразовый QR постамата: живёт 120 с, экран берёт новый каждые ~60 с,
+         старый при этом гаснет. Скриншот, пересланный другу, быстро протухнет. */
+      let tokenTimer = null;
+      let countdownTimer = null;
+      let tokenExpires = 0;
+      const stopLockerCode = () => {
+        clearTimeout(tokenTimer);
+        clearInterval(countdownTimer);
+        tokenTimer = null;
+        countdownTimer = null;
+      };
+      const refreshLockerCode = async () => {
+        const qrHost = body.querySelector('#locker-qr');
+        if (!qrHost || !document.body.contains(body)) { stopLockerCode(); return; }
+        try {
+          const t = await api.post(`/api/orders/${order.id}/pickup-token`, {}, { silent: true });
+          qrHost.innerHTML = t.qr_svg;
+          qrHost.querySelector('svg')?.setAttribute('aria-label', `Одноразовый QR заказа ${order.number}`);
+          body.querySelector('#locker-pin').innerHTML = `PIN <b>${esc(t.pin.slice(0, 3))} ${esc(t.pin.slice(3))}</b>`;
+          tokenExpires = Date.now() + t.ttl_seconds * 1000;
+          tokenTimer = setTimeout(refreshLockerCode, t.refresh_after_seconds * 1000);
+        } catch (err) {
+          body.querySelector('#locker-timer').textContent = err.status === 0
+            ? 'Нет связи — код обновится, когда появится интернет'
+            : err.message;
+          tokenTimer = setTimeout(refreshLockerCode, 10000);
+        }
+      };
+      const syncLockerCode = () => {
+        stopLockerCode();
+        if (order.status !== 'in_locker') return;
+        refreshLockerCode();
+        countdownTimer = setInterval(() => {
+          const label = body.querySelector('#locker-timer');
+          if (!label || !document.body.contains(body)) { stopLockerCode(); return; }
+          const left = Math.max(0, Math.round((tokenExpires - Date.now()) / 1000));
+          if (tokenExpires) label.textContent = `Код одноразовый · действует ещё ${left} с`;
+        }, 1000);
       };
 
       render();
@@ -203,6 +271,7 @@ export default async function orderView(ctx) {
             previous = fresh.status;
             render();
             if (fresh.status === 'ready') toast('🔔 Заказ готов к выдаче!', 'ok');
+            if (fresh.status === 'in_locker') toast(`📦 ${lockerText(fresh)}`, 'ok');
             if (fresh.status === 'issued') toast('Заказ выдан. Приятного аппетита!', 'ok');
             await loadActiveOrders().catch(() => []);
           }

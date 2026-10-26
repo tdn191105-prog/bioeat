@@ -238,9 +238,17 @@ class Order(Base):
     cancelled_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     # почему отменён: expired — не оплатили вовремя, deadline — оплата после отсечки
     cancel_reason: Mapped[str] = mapped_column(String(40), default="")
+    # --- постамат ---------------------------------------------------------- #
+    locker_id: Mapped[int | None] = mapped_column(
+        ForeignKey("lockers.id", ondelete="SET NULL"), nullable=True
+    )
+    cell_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    placed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    picked_up_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     user: Mapped[User] = relationship(back_populates="orders", lazy="joined")
     slot: Mapped[PickupSlot | None] = relationship(lazy="joined")
+    locker: Mapped[Locker | None] = relationship(lazy="joined")
     items: Mapped[list[OrderItem]] = relationship(
         back_populates="order", cascade="all, delete-orphan", lazy="selectin"
     )
@@ -283,3 +291,123 @@ class Payment(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
     order: Mapped[Order] = relationship(back_populates="payments")
+
+
+# --------------------------------------------------------------------------- #
+#  Постамат
+#
+#  Постамат привязан к точке выдачи строкой — тем же текстом, что в
+#  PickupSlot.point и Order.pickup_point. Отдельная сущность PickupPoint
+#  потребовала бы переносить данные в уже развёрнутых базах, а автомиграция
+#  умеет только добавлять колонки. Когда появится Alembic, строку стоит
+#  заменить внешним ключом на таблицу точек.
+# --------------------------------------------------------------------------- #
+class CellState(str, enum.Enum):
+    free = "free"                      # пустая, можно класть
+    reserved = "reserved"              # зарезервирована под заказ (кладут прямо сейчас)
+    occupied = "occupied"              # в ячейке лежит заказ
+    out_of_service = "out_of_service"  # не открывается / сломана
+
+
+class CellSize(str, enum.Enum):
+    S = "S"
+    M = "M"
+    L = "L"
+
+
+class Locker(Base):
+    __tablename__ = "lockers"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(120))                    # «Корпус Б, 1 этаж»
+    point: Mapped[str] = mapped_column(String(120), index=True)       # = PickupSlot.point
+    device_id: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    # секрет устройства выводится из SECRET_KEY и версии ключа (см. app/lockers.py);
+    # в базе — только хэш, чтобы заметить рассинхрон после смены ключа
+    device_secret_hash: Mapped[str] = mapped_column(String(64), default="")
+    key_version: Mapped[int] = mapped_column(Integer, default=1)
+    last_seen_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    is_online: Mapped[bool] = mapped_column(Boolean, default=False)
+    firmware: Mapped[str] = mapped_column(String(40), default="")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    cells: Mapped[list[LockerCell]] = relationship(
+        back_populates="locker", cascade="all, delete-orphan", lazy="selectin",
+        order_by="LockerCell.number",
+    )
+
+
+class LockerCell(Base):
+    __tablename__ = "locker_cells"
+    __table_args__ = (UniqueConstraint("locker_id", "number", name="uq_locker_cell"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    locker_id: Mapped[int] = mapped_column(ForeignKey("lockers.id", ondelete="CASCADE"), index=True)
+    number: Mapped[int] = mapped_column(Integer)
+    size: Mapped[CellSize] = mapped_column(Enum(CellSize, native_enum=False, length=4), default=CellSize.M)
+    state: Mapped[CellState] = mapped_column(
+        Enum(CellState, native_enum=False, length=20), default=CellState.free, index=True
+    )
+    # без внешнего ключа: orders уже ссылается на lockers, цикл FK SQLite не создаст
+    order_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
+
+    locker: Mapped[Locker] = relationship(back_populates="cells")
+
+
+class PickupToken(Base):
+    """Одноразовый код выдачи из постамата: QR (128 бит) или 6-значный PIN.
+
+    В базе — только хэш. Использование атомарное: UPDATE … WHERE used_at IS NULL.
+    """
+
+    __tablename__ = "pickup_tokens"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    order_id: Mapped[int] = mapped_column(ForeignKey("orders.id", ondelete="CASCADE"), index=True)
+    kind: Mapped[str] = mapped_column(String(8), default="qr")      # qr | pin
+    token_hash: Mapped[str] = mapped_column(String(64), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    expires_at: Mapped[datetime] = mapped_column(DateTime, index=True)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class DeviceNonce(Base):
+    """Одноразовые nonce запросов постамата — защита от повтора перехваченного запроса."""
+
+    __tablename__ = "device_nonces"
+    __table_args__ = (UniqueConstraint("locker_id", "nonce", name="uq_device_nonce"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    locker_id: Mapped[int] = mapped_column(ForeignKey("lockers.id", ondelete="CASCADE"), index=True)
+    nonce: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+
+
+class LockerCommand(Base):
+    """Команда серверу → постамату (open ячейки), забирается long-polling."""
+
+    __tablename__ = "locker_commands"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    locker_id: Mapped[int] = mapped_column(ForeignKey("lockers.id", ondelete="CASCADE"), index=True)
+    action: Mapped[str] = mapped_column(String(20), default="open")
+    cell_number: Mapped[int] = mapped_column(Integer)
+    reason: Mapped[str] = mapped_column(String(40), default="")    # load | unload | service | pickup
+    order_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+    delivered_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class LockerEvent(Base):
+    """Журнал постамата: сканы, двери, датчики, неудачные PIN (для лимита попыток)."""
+
+    __tablename__ = "locker_events"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    locker_id: Mapped[int] = mapped_column(ForeignKey("lockers.id", ondelete="CASCADE"), index=True)
+    kind: Mapped[str] = mapped_column(String(30), index=True)
+    cell_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    order_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    detail: Mapped[str] = mapped_column(String(200), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)

@@ -1,18 +1,16 @@
 """Заказы студента: оформление, оплата, история, QR-код."""
 from __future__ import annotations
 
-import io
-
-import qrcode
-import qrcode.image.svg
 from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_session
 from ..deps import current_user
+from ..lockers import issue_pickup_token, pickup_snapshot
 from ..models import ACTIVE_STATUSES, Order, OrderStatus, User, UserRole
-from ..schemas import OrderCreateIn, OrderOut, PayIn, PayOut
+from ..qr import qr_svg
+from ..schemas import OrderCreateIn, OrderOut, PayIn, PayOut, PickupTokenOut
 from ..services import (
     cancel_order,
     create_order,
@@ -141,20 +139,30 @@ async def order_qr(
     user: User = Depends(current_user),
     session: AsyncSession = Depends(get_session),
 ):
-    """QR-код выдачи в виде SVG — масштабируется без потерь на любом экране."""
+    """QR-код выдачи в окне в виде SVG (подписанный, одноразовый по факту выдачи)."""
     order = await _load_order(session, order_id, user)
-    factory = qrcode.image.svg.SvgPathImage
-    qr = qrcode.QRCode(box_size=10, border=1, error_correction=qrcode.constants.ERROR_CORRECT_M)
-    qr.add_data(order.pickup_code)
-    qr.make(fit=True)
-    img = qr.make_image(image_factory=factory)
-    buf = io.BytesIO()
-    img.save(buf)
-    svg = buf.getvalue().decode("utf-8")
-    # белый фон + чёрный код читается сканерами лучше всего
-    svg = svg.replace("<svg ", '<svg style="background:#fff" ', 1)
     return Response(
-        content=svg,
+        content=qr_svg(order.pickup_code),
         media_type="image/svg+xml",
         headers={"Cache-Control": "no-store"},
     )
+
+
+@router.post("/{order_id}/pickup-token", response_model=PickupTokenOut)
+async def pickup_token(
+    order_id: int,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Одноразовый QR и PIN для постамата. Каждый новый запрос гасит прежние коды."""
+    order = await _load_order(session, order_id, user)
+    if order.user_id != user.id:
+        raise HTTPException(status_code=403, detail="Код получает только владелец заказа")
+    data = await issue_pickup_token(session, order)
+    snapshot = pickup_snapshot(order)
+    return {
+        **data,
+        "qr_svg": qr_svg(data["code"]),
+        "cell_number": order.cell_number,
+        "locker_name": snapshot["locker_name"],
+    }

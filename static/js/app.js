@@ -261,7 +261,9 @@ window.addEventListener('hashchange', () => {
         .filter((o) => ['ready', 'in_locker'].includes(o.status) && !before.has(o.id) && !readyShown.has(o.id))
         .forEach((o) => {
           readyShown.add(o.id);
-          toast(`🔔 Заказ ${o.number} готов к выдаче`, 'ok');
+          toast(o.status === 'in_locker' && o.cell_number
+            ? `📦 Заказ ${o.number} в ячейке №${o.cell_number}`
+            : `🔔 Заказ ${o.number} готов к выдаче`, 'ok');
         });
     } catch { /* не мешаем пользователю сетевыми ошибками фонового опроса */ }
   }, 20000);

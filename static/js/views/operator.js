@@ -2,7 +2,7 @@
    Процесс кухни: после отсечки перемены повара собирают все её заказы разом,
    поэтому экран построен вокруг перемен, а не вокруг канбана статусов. */
 import api from '../api.js';
-import { esc, money, toast, isoDate, dateLabel, skeletonList, empty, confirmSheet } from '../ui.js';
+import { esc, money, toast, isoDate, dateLabel, skeletonList, empty, confirmSheet, openSheet, closeSheet } from '../ui.js';
 import { itemThumb } from '../components.js';
 
 const COLLECT = ['paid', 'accepted', 'cooking'];
@@ -89,6 +89,8 @@ export default async function operatorView() {
           actions.push(`<button class="btn btn--sm" data-place="${order.id}">Положен в ячейку</button>`);
         } else if (order.status === 'ready') {
           actions.push(`<button class="btn btn--sm btn--green" data-issue="${order.id}">Выдан</button>`);
+        } else if (order.status === 'in_locker') {
+          actions.push(`<button class="btn btn--sm btn--ghost" data-unload="${order.id}">Забрать из ячейки</button>`);
         }
         actions.push(`<button class="btn btn--sm btn--danger" data-cancel="${order.id}" aria-label="Отменить заказ ${esc(order.number)}">Отменить</button>`);
         return `
@@ -326,9 +328,21 @@ export default async function operatorView() {
             button.disabled = true;
             await patchStatus(button.dataset.issue, 'issued', (o) => `${o.number} выдан`);
           } else if (button.dataset.place) {
+            const cell = await askCell();
+            if (cell === null) return;
             button.disabled = true;
-            const order = await api.post(`/api/operator/orders/${button.dataset.place}/place`, {});
-            toast(`${order.number} → ячейка №${order.cell_number}`, 'ok');
+            const order = await api.post(`/api/operator/orders/${button.dataset.place}/place`,
+              cell ? { cell_number: cell } : {});
+            toast(`${order.number} → ячейка №${order.cell_number} (дверца открывается)`, 'ok');
+          } else if (button.dataset.unload) {
+            const ok = await confirmSheet({
+              title: 'Забрать заказ из ячейки?',
+              text: 'Ячейка откроется, заказ вернётся в окно выдачи — студент заберёт его по номеру.',
+              confirmLabel: 'Открыть и забрать',
+            });
+            if (!ok) return;
+            const order = await api.post(`/api/operator/orders/${button.dataset.unload}/unload`, {});
+            toast(`${order.number}: ячейка открыта, заказ в окне выдачи`, 'ok');
           } else if (button.dataset.collectAll) {
             const slot = data.slots.find((s) => String(s.id) === button.dataset.collectAll);
             const ok = await confirmSheet({
@@ -356,6 +370,26 @@ export default async function operatorView() {
           button.disabled = false;
         }
         await load(true);
+      });
+
+      /* Ячейку выбирает сервер; номер вручную — если повар уже положил заказ в конкретную. */
+      const askCell = () => new Promise((resolve) => {
+        let settled = false;
+        const finish = (value) => { if (!settled) { settled = true; closeSheet(); resolve(value); } };
+        openSheet(
+          `<div class="stack">
+            <h2 class="section__title" style="font-size:21px">Положить в ячейку</h2>
+            <p class="muted" style="margin:0">Свободная ячейка выберется сама и откроется. Если заказ уже лежит в конкретной ячейке — укажите её номер.</p>
+            <div class="field"><label class="field__label" for="cell-no">Номер ячейки (необязательно)</label>
+              <input class="input" id="cell-no" type="number" inputmode="numeric" min="1" max="999" placeholder="авто"></div>
+            <button class="btn" data-yes>Положить</button>
+            <button class="btn btn--ghost" data-no>Отмена</button>
+          </div>`,
+          (sheet) => {
+            sheet.querySelector('[data-yes]').onclick = () => finish(Number(sheet.querySelector('#cell-no').value) || 0);
+            sheet.querySelector('[data-no]').onclick = () => finish(null);
+          },
+        );
       });
 
       const showOrder = (order, kind = '') => {
